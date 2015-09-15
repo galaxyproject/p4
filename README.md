@@ -1,5 +1,7 @@
 # Proper Prior PR Planning
 
+[![Build Status](https://travis-ci.org/erasche/p4.svg)](https://travis-ci.org/erasche/p4)
+
 Simple bot to comment on GitHub repositories to help guide repository
 maintenance. This includes things like ensuring enough members of the core team
 +1 a pull request, and otherwise help ensure that procedures are consistently
