@@ -10,10 +10,11 @@ followed for merging of PRs.
 - run the script as regularly as seems reasonable (and stays within your GH API
   limits)
 - the script fetches all pull requests for a repository
-- this data is compared against a list
-- those that have changed since last time are investigated individually
+- this data is compared against a database
+- PRs which have updated since the last run are checked individually
 - various filters are applied to the PR, with user-defined behaviour resulting
   if the PR matches a filter
+- if a PR passes all filters, one or more actions is executed.
 - the database is updated
 
 
