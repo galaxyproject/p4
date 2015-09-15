@@ -16,12 +16,12 @@ gh = Github(
 
 class PullRequestFilter(object):
 
-    def __init__(self, name, conditions, actions, committer_group, repo_owner,
-                 repo_name, bot_user):
+    def __init__(self, name, conditions, actions, committer_group=None, repo_owner=None,
+                 repo_name=None, bot_user=None):
         self.name = name
         self.conditions = conditions
         self.actions = actions
-        self.committer_group = committer_group
+        self.committer_group = [] if committer_group is None else committer_group
         self.repo_owner = repo_owner
         self.repo_name = repo_name
         self.bot_user = bot_user
