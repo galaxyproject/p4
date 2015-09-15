@@ -1,0 +1,64 @@
+meta:
+    database_path: ./cache.sqlite
+    bot_user: erasche
+
+repository:
+    owner: galaxyproject
+    name: galaxy
+    pr_approvers:
+        - martenson
+        - afgane
+        - bgruening
+        - blankenberg
+        - carlfeberhard
+        - dannon
+        - davebx
+        - erasche
+        - guerler
+        - jennaj
+        - jgoecks
+        - jmchilton
+        - jxtx
+        - natefoo
+        - nekrut
+        - nitesh1989
+        - nsoranzo
+        - tnabtaf
+    filters:
+        -
+            name: Check Procedures PRs for mergability
+            conditions:
+                - state: 'open'
+                - title_contains: '[PROCEDURES]'
+                - older_than: 168 hours ago
+                - plus__gt: 5
+                - minus__eq: 0
+            actions:
+                -
+                    action: comment
+                    comment: "{author}'s PR has reached the threshold of 168 hours and quorum of at least 5 binding +1 votes. One of the maintainers is now bound to merge this PR."
+                #-
+                    #action: merge
+                    #comment: "Automatically merged by Galaxy Jenkins Github Bot"
+        -
+            name: Check PRs to dev for mergability
+            conditions:
+                - state: 'open'
+                - title_contains__not: '[PROCEDURES]'
+                - plus__ge: 1
+                - to_branch: dev
+            actions:
+                -
+                    action: comment
+                    comment: "{author}'s PR has reached the required number of votes for merging. Does anyone wish to do this?"
+        -
+            name: Check bugfix PRs for mergability
+            conditions:
+                - state: 'open'
+                - title_contains__not: '[PROCEDURES]'
+                - plus__ge: 2
+                - to_branch__not: dev
+            actions:
+                -
+                    action: comment
+                    comment: "{author}'s PR has reached the required number of votes for merging. Does anyone wish to do this?"
