@@ -5,6 +5,7 @@ meta:
 repository:
     owner: galaxyproject
     name: galaxy
+    # List of people whose +1/-1 votes actually count
     pr_approvers:
         - martenson
         - afgane
@@ -24,34 +25,65 @@ repository:
         - nitesh1989
         - nsoranzo
         - tnabtaf
+    # Filters are designed to say "is this PR at the current state in time interesting?"
     filters:
         -
+            # Name isn't really used except in logging messages.
             name: Check Procedures PRs for mergability
+            # Conditions specify whether or not a given PR (and associated
+            # comments) are within certain ranges.
             conditions:
+                # Note that these are technically an array of dictionaries with
+                # only one key. You can collapse these into a single dictionary
+                # if there aren't any duplicate keys, however the current
+                # design permits you to have multiple rules like
+                # `title_contains`
+                #
+                # We first find only open PRs
                 - state: 'open'
+                # If the title contains the text `[PROCEDURES]`
                 - title_contains: '[PROCEDURES]'
+                # And the PR is older than 168 hours ago
                 - older_than: 168 hours ago
-                - plus__gt: 5
+                # With 5 or more :+1: votes
+                - plus__ge: 5
+                # And ZERO :-1: votes
                 - minus__eq: 0
+            # If we pass all of our conditions, we execute one (or more)
+            # actions.
             actions:
+
                 -
                     action: comment
-                    comment: "{author}'s PR has reached the threshold of 168 hours and quorum of at least 5 binding +1 votes. One of the maintainers is now bound to merge this PR."
+                    comment: |
+                        {author}'s PR has reached the threshold of 168 hours
+                        and quorum of at least 5 binding +1 votes. One of the
+                        maintainers is now bound to merge this PR.
+                # The merge action is not yet implmemented, with no immediate
+                # plans
                 #-
                     #action: merge
                     #comment: "Automatically merged by Galaxy Jenkins Github Bot"
         -
+            # Here we have another rule for things which aren't PROCEDURES PRs.
+            # They must have at least 1 +1 vote, and be merging into the dev
+            # branch
             name: Check PRs to dev for mergability
             conditions:
                 - state: 'open'
                 - title_contains__not: '[PROCEDURES]'
-                - plus__ge: 1
                 - to_branch: dev
+                - plus__ge: 1
             actions:
                 -
                     action: comment
-                    comment: "{author}'s PR has reached the required number of votes for merging. Does anyone wish to do this?"
+                    comment: |
+                        {author}'s PR has reached the required number of votes
+                        for merging. Does anyone wish to do this?
         -
+            # And finally we have another rule for non-PROCEDURES PRs to
+            # non-dev branches, i.e. bugfixes to old branches.
+            # Unlike regular PRs to dev, these must have at least 2 :+1: votes.
             name: Check bugfix PRs for mergability
             conditions:
                 - state: 'open'
@@ -61,4 +93,6 @@ repository:
             actions:
                 -
                     action: comment
-                    comment: "{author}'s PR has reached the required number of votes for merging. Does anyone wish to do this?"
+                    comment: |
+                        {author}'s PR has reached the required number of votes
+                        for merging. Does anyone wish to do this?
