@@ -135,7 +135,7 @@ class PullRequestFilter(object):
 
         comment_text = action['comment'].format(
             author='@' + pr.user['login']
-        )
+        ).strip().replace('\n', ' ')
 
         log.info("Executing action")
 
