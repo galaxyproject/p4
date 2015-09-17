@@ -273,8 +273,6 @@ class MergerBot(object):
                     print cached_pr_time, resource.updated_at
                     if cached_pr_time != resource.updated_at:
                         changed_prs.append(PullRequest(resource))
-                break
-            break
         return changed_prs
 
     def run(self):
