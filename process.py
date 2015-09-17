@@ -5,7 +5,7 @@ import sqlite3
 import datetime
 import parsedatetime
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 log = logging.getLogger()
 
 gh = Github(
@@ -279,13 +279,7 @@ class MergerBot(object):
 
     def run(self):
         changed_prs = self.get_prs2()
-        # changed_prs = [
-            # PullRequest(gh.pull_requests.get(
-                # 1,
-                # user=self.config['repository']['owner'],
-                # repo=self.config['repository']['name']))
-        # ]
-        log.debug("Found %s PRs to examine", len(changed_prs))
+        log.info("Found %s PRs to examine", len(changed_prs))
         for changed in changed_prs:
             for pr_filter in self.pr_filters:
                 pr_filter.apply(changed)
