@@ -43,6 +43,7 @@ repository:
                 - state: 'open'
                 # If the title contains the text `[PROCEDURES]`
                 - title_contains: '[PROCEDURES]'
+                - title_contains__not: '[WIP]'
                 # And the PR is older than 168 hours ago
                 - older_than: 168 hours ago
                 # With 5 or more :+1: votes
@@ -72,6 +73,7 @@ repository:
             conditions:
                 - state: 'open'
                 - title_contains__not: '[PROCEDURES]'
+                - title_contains__not: '[WIP]'
                 - to_branch: dev
                 - plus__ge: 1
             actions:
@@ -88,6 +90,7 @@ repository:
             conditions:
                 - state: 'open'
                 - title_contains__not: '[PROCEDURES]'
+                - title_contains__not: '[WIP]'
                 - plus__ge: 2
                 - to_branch__not: dev
             actions:
