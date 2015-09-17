@@ -1,4 +1,6 @@
+#!/usr/bin/env python
 import os
+import re
 import yaml
 from pygithub3 import Github
 import sqlite3
@@ -88,32 +90,35 @@ class PullRequestFilter(object):
     def check_state(self, pr, cv=None):
         return pr.state == cv
 
-    def _find_in_comments(self, comments, text):
+    def _find_in_comments(self, comments, regex):
         for page in comments:
             for resource in page:
-                if text in resource.body:
+                log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
+                if re.findall(regex, resource.body, re.MULTILINE):
                     yield resource
 
     def check_plus(self, pr, cv=None):
-        if getattr(pr, '_comments', None) is None:
-            pr._comments = gh.issues.comments.list(
+        if getattr(pr, 'memo_comments', None) is None:
+            pr.memo_comments = gh.issues.comments.list(
                 pr.number, user=self.repo_owner, repo=self.repo_name)
 
         count = 0
-        for plus1_comment in self._find_in_comments(pr._comments, ':+1:'):
+        for plus1_comment in self._find_in_comments(pr.memo_comments, '(:\+1:|^\s*\+1\s*$)'):
             if plus1_comment.user.login in self.committer_group:
                 count += 1
+
         return count
 
     def check_minus(self, pr, cv=None):
-        if getattr(pr, '_comments', None) is None:
-            pr._comments = gh.issues.comments.list(
+        if getattr(pr, 'memo_comments', None) is None:
+            pr.memo_comments = gh.issues.comments.list(
                 pr.number, user=self.repo_owner, repo=self.repo_name)
 
         count = 0
-        for minus1_comment in self._find_in_comments(pr._comments, ':-1:'):
+        for minus1_comment in self._find_in_comments(pr.memo_comments, '(:-1:|^\s*-1\s*$)'):
             if minus1_comment.user.login in self.committer_group:
                 count += 1
+
         return count
 
     def check_to_branch(self, pr, cv=None):
@@ -270,7 +275,7 @@ class MergerBot(object):
                 else:
                     # compare updated_at times.
                     cached_pr_time = cached_pr[1]
-                    print cached_pr_time, resource.updated_at
+                    log.debug(cached_pr_time, resource.updated_at)
                     if cached_pr_time != resource.updated_at:
                         changed_prs.append(PullRequest(resource))
         return changed_prs

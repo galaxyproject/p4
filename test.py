@@ -159,6 +159,128 @@ class TestPullRequestFilter(unittest.TestCase):
             )
         )
 
+    def test_find_in_comments(self):
+        prf = PullRequestFilter("test_filter", [], [])
+        comments_container = [
+            [[AttrDict({'body': '+1', 'expect': True})]],
+            [[AttrDict({'body': ':+1:', 'expect': True})]],
+            [[AttrDict({'body': 'asdf +1 asdf', 'expect': False})]],
+            [[AttrDict({'body': 'asdf :+1: asdf', 'expect': True})]],
+            [[AttrDict({'body': 'asdf\n+1\nasdf', 'expect': True})]],
+            [[AttrDict({'body': 'asdf\n:+1:\nasdf', 'expect': True})]],
+        ]
+        for x in comments_container:
+            result = len(list(prf._find_in_comments(x, '(:\+1:|^\s*\+1\s*$)'))) > 0,
+            self.assertEquals(
+                result[0],
+                x[0][0]['expect'],
+                msg="body: '%s' did not produce the expected result." % x[0][0]['body']
+            )
+
+    def test_check_minus_member(self):
+        prf = PullRequestFilter("test_filter", [], [], committer_group=['erasche'])
+        test_cases = [
+            {'body': '-1', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': '-1  ', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': ':-1:', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': 'asdf  -1   asdf', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf  :-1: asdf', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': 'asdf\n -1\n asdf', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': 'asdf\n:-1:\nasdf', 'user': {'login': 'erasche'}, 'counts': 1},
+        ]
+
+        for case in test_cases:
+            tmppr = AttrDict({
+                'state': 'open',
+                'memo_comments': [[case]]
+            })
+
+            self.assertEquals(
+                case['counts'],
+                prf.check_minus(
+                    tmppr
+                ),
+                msg="'%s' failed" % case['body']
+            )
+
+    def test_check_minus_nonmember(self):
+        prf = PullRequestFilter("test_filter", [], [], committer_group=[''])
+        test_cases = [
+            {'body': '-1', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': '-1  ', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': ':-1:', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf  -1   asdf', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf  :-1: asdf', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf\n -1\n asdf', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf\n:-1:\nasdf', 'user': {'login': 'erasche'}, 'counts': 0},
+        ]
+
+        for case in test_cases:
+            tmppr = AttrDict({
+                'state': 'open',
+                'memo_comments': [[case]]
+            })
+
+            self.assertEquals(
+                case['counts'],
+                prf.check_minus(
+                    tmppr
+                ),
+                msg="'%s' failed" % case['body']
+            )
+
+    def test_check_plus_member(self):
+        prf = PullRequestFilter("test_filter", [], [], committer_group=['erasche'])
+        test_cases = [
+            {'body': '+1', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': '+1  ', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': ':+1:', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': 'asdf  +1   asdf', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf  :+1: asdf', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': 'asdf\n +1\n asdf', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': 'asdf\n:+1:\nasdf', 'user': {'login': 'erasche'}, 'counts': 1},
+        ]
+
+        for case in test_cases:
+            tmppr = AttrDict({
+                'state': 'open',
+                'memo_comments': [[case]]
+            })
+
+            self.assertEquals(
+                case['counts'],
+                prf.check_plus(
+                    tmppr
+                ),
+                msg="'%s' failed" % case['body']
+            )
+
+    def test_check_plus_nonmember(self):
+        prf = PullRequestFilter("test_filter", [], [], committer_group=[''])
+        test_cases = [
+            {'body': '+1', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': '+1  ', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': ':+1:', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf  +1   asdf', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf  :+1: asdf', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf\n +1\n asdf', 'user': {'login': 'erasche'}, 'counts': 0},
+            {'body': 'asdf\n:+1:\nasdf', 'user': {'login': 'erasche'}, 'counts': 0},
+        ]
+
+        for case in test_cases:
+            tmppr = AttrDict({
+                'state': 'open',
+                'memo_comments': [[case]]
+            })
+
+            self.assertEquals(
+                case['counts'],
+                prf.check_plus(
+                    tmppr
+                ),
+                msg="'%s' failed" % case['body']
+            )
+
     def test_prf_apply_eval(self):
         prf = PullRequestFilter(
             "test_filter",
