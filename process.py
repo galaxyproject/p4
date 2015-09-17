@@ -40,7 +40,7 @@ class PullRequestFilter(object):
             if not self.evaluate(pr, condition_key, condition_value):
                 return
 
-        log.info("Matched %s", self.name)
+        log.info("Matched %s", pr)
 
         # If we've made it this far, we pass ALL conditions
         for action in self.actions:
@@ -189,7 +189,9 @@ class PullRequest(object):
         # 'updated_at', 'url', 'user'
 
     def __str__(self):
-        return '<#%s "%s" by @%s>' % (self.number, self.title, self.user['login'])
+        return '<#%s "%s" by @%s (https://github.com/%s/%s/pull/%s)>' % (
+            self.number, self.title, self.user['login'], self.repo_owner,
+            self.repo_name, self.number)
 
 
 class MergerBot(object):
