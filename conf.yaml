@@ -58,8 +58,7 @@ repository:
                     action: comment
                     comment: |
                         {author}'s PR has reached the threshold of 168 hours
-                        and quorum of at least 5 binding +1 votes. One of the
-                        maintainers is now bound to merge this PR.
+                        and quorum of at least 5 binding +1 votes.
                 # The merge action is not yet implmemented, with no immediate
                 # plans
                 #-
@@ -81,4 +80,4 @@ repository:
                     action: comment
                     comment: |
                         {author}'s PR has reached the required number of votes
-                        for merging. Does anyone wish to do this?
+                        for merging.
