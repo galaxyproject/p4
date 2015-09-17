@@ -66,23 +66,6 @@ repository:
                     #action: merge
                     #comment: "Automatically merged by Galaxy Jenkins Github Bot"
         -
-            # Here we have another rule for things which aren't PROCEDURES PRs.
-            # They must have at least 1 +1 vote, and be merging into the dev
-            # branch
-            name: Check PRs to dev for mergability
-            conditions:
-                - state: 'open'
-                - title_contains__not: '[PROCEDURES]'
-                - title_contains__not: '[WIP]'
-                - to_branch: dev
-                - plus__ge: 1
-            actions:
-                -
-                    action: comment
-                    comment: |
-                        {author}'s PR has reached the required number of votes
-                        for merging. Does anyone wish to do this?
-        -
             # And finally we have another rule for non-PROCEDURES PRs to
             # non-dev branches, i.e. bugfixes to old branches.
             # Unlike regular PRs to dev, these must have at least 2 :+1: votes.
