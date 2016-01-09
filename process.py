@@ -5,6 +5,7 @@ import yaml
 from pygithub3 import Github
 import sqlite3
 import datetime
+from dateutil import parser as dtp
 import parsedatetime
 import argparse
 import logging
@@ -20,7 +21,7 @@ gh = Github(
 class PullRequestFilter(object):
 
     def __init__(self, name, conditions, actions, committer_group=None, repo_owner=None,
-                 repo_name=None, bot_user=None, dry_run=False):
+                 repo_name=None, bot_user=None, dry_run=False, next_milestone=None):
         self.name = name
         self.conditions = conditions
         self.actions = actions
@@ -29,6 +30,7 @@ class PullRequestFilter(object):
         self.repo_name = repo_name
         self.bot_user = bot_user
         self.dry_run = dry_run
+        self.next_milestone = next_milestone
         log.info("Registered PullRequestFilter %s", name)
 
     def condition_it(self):
@@ -51,6 +53,13 @@ class PullRequestFilter(object):
         return True
 
     def evaluate(self, pr, condition_key, condition_value):
+        """Evaluate a condition like "title_contains" or "plus__ge".
+
+        The condition_key maps to a function such as "check_title_contains" or "check_plus"
+        If there is a '__X' that maps to a comparator function which is
+        then used to evlauate the result.
+        """
+
         # Some conditions contain an aditional operation we must respect, e.g.
         # __gt or __eq
         if '__' in condition_key:
@@ -61,10 +70,30 @@ class PullRequestFilter(object):
         func = getattr(self, 'check_' + condition_key)
         result = func(pr, cv=condition_value)
 
+        if condition_key == 'created_at':
+            # Times we shoe-horn into numeric types
+            (date_type, date_string) = condition_value.split('::', 1)
+            if date_type == 'relative':
+                # Get the current time, adjusted for strings like "168
+                # hours ago"
+                current = datetime.datetime.now()
+                calendar = parsedatetime.Calendar()
+                compare_against, parsed_as = calendar.parseDT(date_string, current)
+            elif date_type == 'precise':
+                compare_against = dtp.parse(date_string)
+            else:
+                raise Exception("Unknown date string type. Please use 'precise::2016-01-01' or 'relative::yesterday'")
+
+            # Now we update the result to be the total number of seconds
+            result = (result - compare_against).total_seconds()
+            # And condition value to zero
+            condition_value = 0
+            # As a result, all of the math below works.
+
         # There are two types of conditions, text and numeric.
         # Numeric conditions are only appropriate for the following types:
-        # 1) plus, 2) minus
-        if condition_key in ('plus', 'minus'):
+        # 1) plus, 2) minus, 3) times which were hacked in
+        if condition_key in ('plus', 'minus', 'created_at'):
             if condition_op == 'gt':
                 return int(result) > int(condition_value)
             elif condition_op == 'ge':
@@ -126,14 +155,9 @@ class PullRequestFilter(object):
     def check_to_branch(self, pr, cv=None):
         return pr.resource.base['ref'] == cv
 
-    def check_older_than(self, pr, cv=None):
+    def check_created_at(self, pr, cv=None):
         created_at = pr.created_at
-        current = datetime.datetime.now()
-
-        calendar = parsedatetime.Calendar()
-        current_adjusted, parsed_as = calendar.parseDT(cv, current)
-
-        return (created_at - current_adjusted).total_seconds() < 0
+        return created_at
 
     def execute(self, pr, action):
         if action['action'] != 'comment':
@@ -262,20 +286,34 @@ class MergerBot(object):
         self.conn.commit()
 
     def update_pr(self, id, updated_at):
+        if self.dry_run:
+            return
         cursor = self.conn.cursor()
         cursor.execute("""UPDATE pr_data SET updated_at = ? where pr_id = ?""",
                        (updated_at.strftime(self.timefmt), str(id)))
         self.conn.commit()
 
-    def get_prs2(self):
+    def all_prs(self):
         results = gh.pull_requests.list(
             state='open',
             user=self.config['repository']['owner'],
             repo=self.config['repository']['name'])
+        for result in results:
+            yield result
+
+        results = gh.pull_requests.list(
+            state='closed',
+            user=self.config['repository']['owner'],
+            repo=self.config['repository']['name'])
+        for result in results:
+            yield result
+            break
+
+    def get_modified_prs(self):
         # This will contain a list of all new/updated PRs to filter
         changed_prs = []
         # Loop across our GH results
-        for page in results:
+        for page in self.all_prs():
             for resource in page:
                 # Fetch the PR's ID which we use as a key in our db.
                 cached_pr = self.fetch_pr_from_db(resource.id)
@@ -292,7 +330,7 @@ class MergerBot(object):
         return changed_prs
 
     def run(self):
-        changed_prs = self.get_prs2()
+        changed_prs = self.get_modified_prs()
         log.info("Found %s PRs to examine", len(changed_prs))
         for changed in changed_prs:
             for pr_filter in self.pr_filters:
