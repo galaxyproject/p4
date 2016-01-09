@@ -16,23 +16,33 @@ class TestPullRequestFilter(unittest.TestCase):
         adj, parsed_as = calendar.parseDT(relative, datetime.datetime.now())
         return adj
 
-    def test_check_older_than(self):
+    def test_created_at(self):
         prf = PullRequestFilter("test_filter", [], [])
         fakepr = AttrDict({
             'created_at': self._get_dt_from_relative("1 day ago")
         })
 
         self.assertFalse(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="7 days ago"
+                'created_at__lt',
+                "relative::7 days ago"
             )
         )
 
         self.assertTrue(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="tomorrow"
+                'created_at__gt',
+                "precise::2016-01-01",
+            )
+        )
+
+        self.assertTrue(
+            prf.evaluate(
+                fakepr,
+                'created_at__lt',
+                "relative::tomorrow"
             )
         )
 
@@ -42,9 +52,10 @@ class TestPullRequestFilter(unittest.TestCase):
         })
 
         self.assertTrue(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="7 days ago"
+                'created_at__lt',
+                "relative::7 days ago"
             )
         )
 
@@ -54,16 +65,18 @@ class TestPullRequestFilter(unittest.TestCase):
         })
 
         self.assertTrue(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="today"
+                'created_at__lt',
+                "relative::today"
             )
         )
 
         self.assertFalse(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="2 days ago"
+                'created_at__lt',
+                "relative::2 days ago"
             )
         )
 
@@ -130,6 +143,7 @@ class TestPullRequestFilter(unittest.TestCase):
                 cv="anything-else"
             )
         )
+
     def test_pr_evaluate(self):
         prf = PullRequestFilter("test_filter", [], [])
         fakepr = AttrDict({
@@ -146,16 +160,16 @@ class TestPullRequestFilter(unittest.TestCase):
         self.assertTrue(
             prf.evaluate(
                 fakepr,
-                'older_than__not',
-                '3 days ago',
+                'created_at__ge',
+                'relative::3 days ago',
             )
         )
 
         self.assertTrue(
             prf.evaluate(
                 fakepr,
-                'older_than',
-                'today',
+                'created_at__lt',
+                'relative::today',
             )
         )
 
@@ -168,6 +182,8 @@ class TestPullRequestFilter(unittest.TestCase):
             [[AttrDict({'body': 'asdf :+1: asdf', 'expect': True})]],
             [[AttrDict({'body': 'asdf\n+1\nasdf', 'expect': True})]],
             [[AttrDict({'body': 'asdf\n:+1:\nasdf', 'expect': True})]],
+            [[AttrDict({'body': """Yeah, dunno about travis either, but I'm a bit nervous to break the build for everyone else.
+You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect': True})]],
         ]
         for x in comments_container:
             result = len(list(prf._find_in_comments(x, '(:\+1:|^\s*\+1\s*$)'))) > 0,
@@ -289,8 +305,8 @@ class TestPullRequestFilter(unittest.TestCase):
                 'title_contains': '[PROCEDURES]',
                 'title_contains__not': 'Blah',
                 'to_branch': 'dev',
-                'older_than': '0 days ago',
-                'older_than__not': '2 days ago',
+                'created_at__lt': 'relative::0 days ago',
+                'created_at__ge': 'relative::2 days ago',
             },
             []
         )
@@ -314,9 +330,9 @@ class TestPullRequestFilter(unittest.TestCase):
             "test_filter",
             [
                 {'state': 'open', 'title_contains': '[PROCEDURES]'},
-                {'to_branch': 'dev', 'older_than': '0 days ago'},
+                {'to_branch': 'dev', 'created_at__lt': 'relative::0 days ago'},
                 {'title_contains__not': 'Blah'},
-                {'older_than__not': '2 days ago'},
+                {'created_at__ge': 'relative::2 days ago'},
             ],
             []
         )
@@ -328,7 +344,7 @@ class TestPullRequestFilter(unittest.TestCase):
                 ('title_contains', '[PROCEDURES]'),
                 ('title_contains__not', 'Blah'),
                 ('to_branch', 'dev'),
-                ('older_than', '0 days ago'),
-                ('older_than__not', '2 days ago'),
+                ('created_at__lt', 'relative::0 days ago'),
+                ('created_at__ge', 'relative::2 days ago'),
             ])
         )
