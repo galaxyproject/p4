@@ -130,18 +130,26 @@ class PullRequestFilter(object):
                 return result
 
     def check_title_contains(self, pr, cv=None):
+        """condition_value in pr.title
+        """
         return cv in pr.title
 
     def check_milestone(self, pr, cv=None):
+        """condition_value == pr.milestone
+        """
         return pr.milestone == cv
 
     def check_state(self, pr, cv=None):
+        """checks if state == one of cv in (open, closed, merged)
+        """
         if cv == 'merged':
             return pr.merged
         else:
             return pr.state == cv
 
     def _find_in_comments(self, comments, regex):
+        """Search for hits to a regex in a list of comments
+        """
         for comment in comments:
             # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
             if re.findall(regex, comment.body, re.MULTILINE):
@@ -159,6 +167,8 @@ class PullRequestFilter(object):
         return count
 
     def check_has_tag(self, pr, cv=None):
+        """Checks that at least one tag matches the regex provided in condition_value
+        """
         # Tags aren't actually listed in the PR, we have to fetch the issue for that
         m = re.compile(cv)
         issue = self.repo.get_issue(pr.number)
@@ -183,10 +193,15 @@ class PullRequestFilter(object):
         return pr.base.ref == cv
 
     def check_created_at(self, pr, cv=None):
-        created_at = pr.created_at
-        return created_at
+        """Due to condition_values with times, check_created_at simply returns pr.created_at
+
+        Other math must be done to correctly check time. See _time_to_int
+        """
+        return pr.created_at
 
     def execute(self, pr, action):
+        """Execute an action by name.
+        """
         log.info("Executing action")
         if self.dry_run:
             return
@@ -195,6 +210,8 @@ class PullRequestFilter(object):
         return func(pr, action)
 
     def execute_comment(self, pr, action):
+        """Commenting action, generates a comment on the parent PR
+        """
         if getattr(pr, 'memo_comments', None) is None:
             pr.memo_comments = list(pr.get_comments())
 
@@ -220,11 +237,15 @@ class PullRequestFilter(object):
         )
 
     def execute_assign_next_milestone(self, pr, action):
+        """Assigns a pr's milestone to next_milestone
+        """
         # Can only update milestone through associated PR issue.
         issue = self.repo.get_issue(pr.number)
         issue.edit(milestone=self.next_milestone)
 
     def execute_assign_tag(self, pr, action):
+        """Tags a PR
+        """
         issue = self.repo.get_issue(pr.number)
         tag_name = action['action_value']
         issue.add_to_labels(tag_name)
@@ -265,6 +286,7 @@ class MergerBot(object):
             self.pr_filters.append(prf)
 
     def create_db(self, database_name='cache.sqlite'):
+        """Create the database if it doesn't exist"""
         self.conn = sqlite3.connect(database_name)
         cursor = self.conn.cursor()
         cursor.execute(
@@ -277,6 +299,7 @@ class MergerBot(object):
         )
 
     def fetch_pr_from_db(self, id):
+        """select PR from database cache by PR #"""
         cursor = self.conn.cursor()
         cursor.execute("""SELECT * FROM pr_data WHERE pr_id == ?""", (str(id), ))
         row = cursor.fetchone()
@@ -291,12 +314,15 @@ class MergerBot(object):
         return pretty_row
 
     def cache_pr(self, id, updated_at):
+        """Store the PR in the DB cache, along with the last-updated
+        date"""
         cursor = self.conn.cursor()
         cursor.execute("""INSERT INTO pr_data VALUES (?, ?)""",
                        (str(id), updated_at.strftime(self.timefmt)))
         self.conn.commit()
 
     def update_pr(self, id, updated_at):
+        """Update the PR date in the cache"""
         if self.dry_run:
             return
         cursor = self.conn.cursor()
@@ -305,6 +331,12 @@ class MergerBot(object):
         self.conn.commit()
 
     def all_prs(self):
+        """List all open PRs in the repo.
+
+        This... needs work. As it is it fetches EVERY PR, open and closed
+        and that's a monotonically increasing number of API requests per
+        run. Suboptimal.
+        """
         results = self.repo.get_pulls(state='closed')
         for i, result in enumerate(results):
             yield result
@@ -314,7 +346,8 @@ class MergerBot(object):
             yield result
 
     def get_modified_prs(self):
-        # This will contain a list of all new/updated PRs to filter
+        """This will contain a list of all new/updated PRs to filter
+        """
         changed_prs = []
         # Loop across our GH results
         for resource in self.all_prs():
@@ -333,6 +366,8 @@ class MergerBot(object):
         return changed_prs
 
     def run(self):
+        """Find modified PRs, apply the PR filter, and execute associated
+        actions"""
         changed_prs = self.get_modified_prs()
         log.info("Found %s PRs to examine", len(changed_prs))
         for changed in changed_prs:
