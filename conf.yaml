@@ -1,6 +1,6 @@
 meta:
     database_path: ./cache.sqlite
-    bot_user: erasche
+    bot_user: galaxybot
 
 repository:
     owner: galaxyproject

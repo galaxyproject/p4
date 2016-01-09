@@ -6,6 +6,7 @@ from pygithub3 import Github
 import sqlite3
 import datetime
 import parsedatetime
+import argparse
 import logging
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger()
@@ -19,7 +20,7 @@ gh = Github(
 class PullRequestFilter(object):
 
     def __init__(self, name, conditions, actions, committer_group=None, repo_owner=None,
-                 repo_name=None, bot_user=None):
+                 repo_name=None, bot_user=None, dry_run=False):
         self.name = name
         self.conditions = conditions
         self.actions = actions
@@ -27,6 +28,7 @@ class PullRequestFilter(object):
         self.repo_owner = repo_owner
         self.repo_name = repo_name
         self.bot_user = bot_user
+        self.dry_run = dry_run
         log.info("Registered PullRequestFilter %s", name)
 
     def condition_it(self):
@@ -138,15 +140,21 @@ class PullRequestFilter(object):
             raise NotImplementedError("Action %s is not available" %
                                       action['action'])
 
-        comment_text = action['comment'].format(
-            author='@' + pr.user['login']
-        ).strip().replace('\n', ' ')
-
         log.info("Executing action")
+        if self.dry_run:
+            return
 
+        func = getattr(self, 'execute_' + action)
+        return func(pr, action)
+
+    def execute_comment(self, pr, action):
         if getattr(pr, '_comments', None) is None:
             pr._comments = gh.issues.comments.list(
                 pr.number, user=self.repo_owner, repo=self.repo_name)
+
+        comment_text = action['comment'].format(
+            author='@' + pr.user['login']
+        ).strip().replace('\n', ' ')
 
         # Check if we've made this exact comment before, so we don't comment
         # multiple times and annoy people.
@@ -167,8 +175,6 @@ class PullRequestFilter(object):
             user=self.repo_owner,
             repo=self.repo_name,
         )
-
-        return True
 
 
 class PullRequest(object):
@@ -196,7 +202,8 @@ class PullRequest(object):
 
 class MergerBot(object):
 
-    def __init__(self, conf_path):
+    def __init__(self, conf_path, dry_run=False):
+        self.dry_run = dry_run
         with open(conf_path, 'r') as handle:
             self.config = yaml.load(handle)
 
@@ -211,12 +218,14 @@ class MergerBot(object):
                 name=rule['name'],
                 conditions=rule['conditions'],
                 actions=rule['actions'],
+                next_milestone=self.config['repository']['next_milestone'],
 
                 # ugh
                 committer_group=self.config['repository']['pr_approvers'],
                 repo_owner=self.config['repository']['owner'],
                 repo_name=self.config['repository']['name'],
                 bot_user=self.config['meta']['bot_user'],
+                dry_run=self.dry_run,
             )
             self.pr_filters.append(prf)
 
@@ -292,5 +301,9 @@ class MergerBot(object):
 
 
 if __name__ == '__main__':
-    bot = MergerBot('conf.yaml')
+    parser = argparse.ArgumentParser(description='P4 bot')
+    parser.add_argument('--dry-run', dest='dry_run', action='store_true')
+    args = parser.parse_args()
+
+    bot = MergerBot('conf.yaml', **vars(args))
     bot.run()
