@@ -19,6 +19,9 @@ gh = Github(
     token=os.environ.get('GITHUB_OAUTH_TOKEN', None),
 )
 
+UPVOTE_REGEX = '(:\+1:|^\s*\+1\s*$)'
+DOWNVOTE_REGEX = '(:\-1:|^\s*\-1\s*$)'
+
 
 class PullRequestFilter(object):
 
@@ -129,7 +132,7 @@ class PullRequestFilter(object):
     def _find_in_comments(self, comments, regex):
         for page in comments:
             for resource in page:
-                log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
+                # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
                 if re.findall(regex, resource.body, re.MULTILINE):
                     yield resource
 
@@ -139,7 +142,7 @@ class PullRequestFilter(object):
                 pr.number, user=self.repo_owner, repo=self.repo_name)
 
         count = 0
-        for plus1_comment in self._find_in_comments(pr.memo_comments, '(:\+1:|^\s*\+1\s*$)'):
+        for plus1_comment in self._find_in_comments(pr.memo_comments, UPVOTE_REGEX):
             if plus1_comment.user.login in self.committer_group:
                 count += 1
 
@@ -151,7 +154,7 @@ class PullRequestFilter(object):
                 pr.number, user=self.repo_owner, repo=self.repo_name)
 
         count = 0
-        for minus1_comment in self._find_in_comments(pr.memo_comments, '(:-1:|^\s*-1\s*$)'):
+        for minus1_comment in self._find_in_comments(pr.memo_comments, DOWNVOTE_REGEX):
             if minus1_comment.user.login in self.committer_group:
                 count += 1
 
@@ -332,8 +335,8 @@ class MergerBot(object):
                 else:
                     # compare updated_at times.
                     cached_pr_time = cached_pr[1]
-                    log.debug(cached_pr_time, resource.updated_at)
                     if cached_pr_time != resource.updated_at:
+                        log.debug('Cache says: %s last updated at %s', cached_pr_time, resource.updated_at)
                         changed_prs.append(PullRequest(resource))
         return changed_prs
 

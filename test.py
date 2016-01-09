@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
-from process import PullRequestFilter
+from process import PullRequestFilter, UPVOTE_REGEX, DOWNVOTE_REGEX
 import datetime
 import parsedatetime
 from attrdict import AttrDict
@@ -186,7 +186,7 @@ class TestPullRequestFilter(unittest.TestCase):
 You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect': True})]],
         ]
         for x in comments_container:
-            result = len(list(prf._find_in_comments(x, '(:\+1:|^\s*\+1\s*$)'))) > 0,
+            result = len(list(prf._find_in_comments(x, UPVOTE_REGEX))) > 0,
             self.assertEquals(
                 result[0],
                 x[0][0]['expect'],
@@ -255,6 +255,9 @@ You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect':
             {'body': 'asdf  :+1: asdf', 'user': {'login': 'erasche'}, 'counts': 1},
             {'body': 'asdf\n +1\n asdf', 'user': {'login': 'erasche'}, 'counts': 1},
             {'body': 'asdf\n:+1:\nasdf', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': """Yeah, dunno about travis either, but I'm a bit nervous to break the build for everyone else.
+             You have my :+1:, but I'd like a second pair of eyes merging this.""",
+             'counts': 1, 'user': {'login': 'erasche'}},
         ]
 
         for case in test_cases:
