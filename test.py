@@ -83,10 +83,8 @@ class TestPullRequestFilter(unittest.TestCase):
     def test_check_to_branch(self):
         prf = PullRequestFilter("test_filter", [], [])
         fakepr = AttrDict({
-            'resource': {
-                'base': {
-                    'ref': 'dev'
-                }
+            'base': {
+                'ref': 'dev'
             }
         })
 
@@ -176,21 +174,21 @@ class TestPullRequestFilter(unittest.TestCase):
     def test_find_in_comments(self):
         prf = PullRequestFilter("test_filter", [], [])
         comments_container = [
-            [[AttrDict({'body': '+1', 'expect': True})]],
-            [[AttrDict({'body': ':+1:', 'expect': True})]],
-            [[AttrDict({'body': 'asdf +1 asdf', 'expect': False})]],
-            [[AttrDict({'body': 'asdf :+1: asdf', 'expect': True})]],
-            [[AttrDict({'body': 'asdf\n+1\nasdf', 'expect': True})]],
-            [[AttrDict({'body': 'asdf\n:+1:\nasdf', 'expect': True})]],
-            [[AttrDict({'body': """Yeah, dunno about travis either, but I'm a bit nervous to break the build for everyone else.
-You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect': True})]],
+            [AttrDict({'body': '+1', 'expect': True})],
+            [AttrDict({'body': ':+1:', 'expect': True})],
+            [AttrDict({'body': 'asdf +1 asdf', 'expect': False})],
+            [AttrDict({'body': 'asdf :+1: asdf', 'expect': True})],
+            [AttrDict({'body': 'asdf\n+1\nasdf', 'expect': True})],
+            [AttrDict({'body': 'asdf\n:+1:\nasdf', 'expect': True})],
+            [AttrDict({'body': """Yeah, dunno about travis either, but I'm a bit nervous to break the build for everyone else.
+You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect': True})],
         ]
         for x in comments_container:
             result = len(list(prf._find_in_comments(x, UPVOTE_REGEX))) > 0,
             self.assertEquals(
                 result[0],
-                x[0][0]['expect'],
-                msg="body: '%s' did not produce the expected result." % x[0][0]['body']
+                x[0]['expect'],
+                msg="body: '%s' did not produce the expected result." % x[0]['body']
             )
 
     def test_check_minus_member(self):
@@ -208,7 +206,7 @@ You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect':
         for case in test_cases:
             tmppr = AttrDict({
                 'state': 'open',
-                'memo_comments': [[case]]
+                'memo_comments': [case]
             })
 
             self.assertEquals(
@@ -234,7 +232,7 @@ You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect':
         for case in test_cases:
             tmppr = AttrDict({
                 'state': 'open',
-                'memo_comments': [[case]]
+                'memo_comments': [case]
             })
 
             self.assertEquals(
@@ -263,7 +261,7 @@ You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect':
         for case in test_cases:
             tmppr = AttrDict({
                 'state': 'open',
-                'memo_comments': [[case]]
+                'memo_comments': [case]
             })
 
             self.assertEquals(
@@ -289,7 +287,7 @@ You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect':
         for case in test_cases:
             tmppr = AttrDict({
                 'state': 'open',
-                'memo_comments': [[case]]
+                'memo_comments': [case]
             })
 
             self.assertEquals(
@@ -317,10 +315,8 @@ You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect':
         fakepr = AttrDict({
             u'title': u'[PROCEDURES] Testing…',
             u'state': u'open',
-            u'resource': {
-                u'base': {
-                    u'ref': u'dev'
-                }
+            u'base': {
+                u'ref': u'dev'
             },
             u'created_at': self._get_dt_from_relative("1 day ago")
         })
@@ -341,7 +337,7 @@ You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect':
         )
 
         self.assertEquals(
-            sorted(list(prf.condition_it())),
+            sorted(list(prf._condition_it())),
             sorted([
                 ('state', 'open'),
                 ('title_contains', '[PROCEDURES]'),
