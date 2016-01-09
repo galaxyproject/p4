@@ -295,14 +295,9 @@ class MergerBot(object):
         self.conn.commit()
 
     def all_prs(self):
-        yield self.repo.get_pull(852)
-        return
-
         results = self.repo.get_pulls(state='closed')
         for i, result in enumerate(results):
             yield result
-
-        return
 
         results = self.repo.get_pulls(state='open')
         for result in results:
