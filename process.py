@@ -35,14 +35,18 @@ class PullRequestFilter(object):
         self.dry_run = dry_run
         log.info("Registered PullRequestFilter %s", name)
 
-    def condition_it(self):
+    def _condition_it(self):
         for condition_dict in self.conditions:
             for key in condition_dict:
                 yield (key, condition_dict[key])
 
     def apply(self, pr):
+        """Apply a given PRF to a given PR. Causes all appropriate conditions
+        to be evaluated for a PR, and then the appropriate actions to be
+        executed
+        """
         log.debug("\t[%s]", self.name)
-        for (condition_key, condition_value) in self.condition_it():
+        for (condition_key, condition_value) in self._condition_it():
             res = self.evaluate(pr, condition_key, condition_value)
             log.debug("\t\t%s, %s => %s", condition_key, condition_value, res)
 
@@ -50,12 +54,34 @@ class PullRequestFilter(object):
                 return
 
         log.info("Matched %s", pr)
-
         # If we've made it this far, we pass ALL conditions
         for action in self.actions:
             self.execute(pr, action)
 
         return True
+
+    def _time_to_int(self, result, condition_value):
+        # Times we shoe-horn into numeric types.
+        # Since condition_value is a string, we have to have some special
+        # logic for correcting it into a time
+        (date_type, date_string) = condition_value.split('::', 1)
+        if date_type == 'relative':
+            # Get the current time, adjusted for strings like "168
+            # hours ago"
+            current = datetime.datetime.now()
+            calendar = parsedatetime.Calendar()
+            compare_against, parsed_as = calendar.parseDT(date_string, current)
+        elif date_type == 'precise':
+            compare_against = dtp.parse(date_string)
+        else:
+            raise Exception("Unknown date string type. Please use 'precise::2016-01-01' or 'relative::yesterday'")
+
+        # Now we update the result to be the total number of seconds
+        result = (result - compare_against).total_seconds()
+        # And condition value to zero
+        condition_value = 0
+        # As a result, all of the math in evaluate() works.
+        return result, condition_value
 
     def evaluate(self, pr, condition_key, condition_value):
         """Evaluate a condition like "title_contains" or "plus__ge".
@@ -76,24 +102,7 @@ class PullRequestFilter(object):
         result = func(pr, cv=condition_value)
 
         if condition_key == 'created_at':
-            # Times we shoe-horn into numeric types
-            (date_type, date_string) = condition_value.split('::', 1)
-            if date_type == 'relative':
-                # Get the current time, adjusted for strings like "168
-                # hours ago"
-                current = datetime.datetime.now()
-                calendar = parsedatetime.Calendar()
-                compare_against, parsed_as = calendar.parseDT(date_string, current)
-            elif date_type == 'precise':
-                compare_against = dtp.parse(date_string)
-            else:
-                raise Exception("Unknown date string type. Please use 'precise::2016-01-01' or 'relative::yesterday'")
-
-            # Now we update the result to be the total number of seconds
-            result = (result - compare_against).total_seconds()
-            # And condition value to zero
-            condition_value = 0
-            # As a result, all of the math below works.
+            result, condition_value = self._time_to_int(result, condition_value)
 
         # There are two types of conditions, text and numeric.
         # Numeric conditions are only appropriate for the following types:
@@ -249,7 +258,6 @@ class MergerBot(object):
                 actions=rule['actions'],
                 next_milestone=self.next_milestone,
                 repo=self.repo,
-                # ugh
                 committer_group=self.config['repository']['pr_approvers'],
                 bot_user=self.config['meta']['bot_user'],
                 dry_run=self.dry_run,
