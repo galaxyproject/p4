@@ -2,6 +2,7 @@
 import os
 import re
 import yaml
+import pprint
 from pygithub3 import Github
 import sqlite3
 import datetime
@@ -9,12 +10,13 @@ from dateutil import parser as dtp
 import parsedatetime
 import argparse
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger()
 
 gh = Github(
     login=os.environ.get('GITHUB_USERNAME', None),
-    password=os.environ.get('GITHUB_PASSWORD', None)
+    password=os.environ.get('GITHUB_PASSWORD', None),
+    token=os.environ.get('GITHUB_OAUTH_TOKEN', None),
 )
 
 
@@ -39,9 +41,12 @@ class PullRequestFilter(object):
                 yield (key, condition_dict[key])
 
     def apply(self, pr):
+        log.debug("\t[%s]", self.name)
         for (condition_key, condition_value) in self.condition_it():
-            log.debug("[%s] Evaluating %s %s for %s", self.name, condition_key, condition_value, pr)
-            if not self.evaluate(pr, condition_key, condition_value):
+            res = self.evaluate(pr, condition_key, condition_value)
+            log.debug("\t\t%s, %s => %s", condition_key, condition_value, res)
+
+            if not res:
                 return
 
         log.info("Matched %s", pr)
@@ -220,8 +225,8 @@ class PullRequest(object):
 
     def __str__(self):
         return '<#%s "%s" by @%s (https://github.com/%s/%s/pull/%s)>' % (
-            self.number, self.title, self.user['login'], self.repo_owner,
-            self.repo_name, self.number)
+            self.number, self.title, self.user['login'], 'galaxyproject',
+            'galaxy', self.number)
 
 
 class MergerBot(object):
@@ -237,6 +242,7 @@ class MergerBot(object):
         self.timefmt = "%Y-%m-%dT%H:%M:%S.Z"
 
         self.pr_filters = []
+        log.debug(pprint.pformat(self.config['repository']))
         for rule in self.config['repository']['filters']:
             prf = PullRequestFilter(
                 name=rule['name'],
@@ -301,6 +307,8 @@ class MergerBot(object):
         for result in results:
             yield result
 
+        return
+
         results = gh.pull_requests.list(
             state='closed',
             user=self.config['repository']['owner'],
@@ -333,6 +341,8 @@ class MergerBot(object):
         changed_prs = self.get_modified_prs()
         log.info("Found %s PRs to examine", len(changed_prs))
         for changed in changed_prs:
+
+            log.debug("Evaluating %s", changed)
             for pr_filter in self.pr_filters:
                 pr_filter.apply(changed)
                 self.update_pr(changed.id, changed.updated_at)
