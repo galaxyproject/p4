@@ -2,8 +2,7 @@
 import os
 import re
 import yaml
-import pprint
-from pygithub3 import Github
+from github import Github
 import sqlite3
 import datetime
 from dateutil import parser as dtp
@@ -12,11 +11,11 @@ import argparse
 import logging
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger()
+logging.getLogger('github').setLevel(logging.INFO)
 
 gh = Github(
-    login=os.environ.get('GITHUB_USERNAME', None),
+    login_or_token=os.environ.get('GITHUB_USERNAME', None) or os.environ.get('GITHUB_OAUTH_TOKEN', None),
     password=os.environ.get('GITHUB_PASSWORD', None),
-    token=os.environ.get('GITHUB_OAUTH_TOKEN', None),
 )
 
 UPVOTE_REGEX = '(:\+1:|^\s*\+1\s*$)'
@@ -26,17 +25,16 @@ DOWNVOTE_REGEX = '(:\-1:|^\s*\-1\s*$)'
 class PullRequestFilter(object):
 
     def __init__(self, name, conditions, actions, committer_group=None,
-                 repo_owner=None, repo_name=None, bot_user=None,
-                 dry_run=False, next_milestone=None):
+                 bot_user=None, dry_run=False, next_milestone=None, repo=None):
         self.name = name
         self.conditions = conditions
         self.actions = actions
         self.committer_group = [] if committer_group is None else committer_group
-        self.repo_owner = repo_owner
-        self.repo_name = repo_name
+        self.repo = repo
         self.bot_user = bot_user
         self.dry_run = dry_run
-        self.next_milestone = next_milestone
+        self.milestones = list(self.repo.get_milestones())
+        self.next_milestone = [x for x in self.milestones if x.title == next_milestone][0]
         log.info("Registered PullRequestFilter %s", name)
 
     def condition_it(self):
@@ -128,24 +126,23 @@ class PullRequestFilter(object):
         return cv in pr.title
 
     def check_milestone(self, pr, cv=None):
-        print dir(pr), cv, pr.url
-        import sys
-        sys.exit()
+        return pr.milestone == cv
 
     def check_state(self, pr, cv=None):
-        return pr.state == cv
+        if cv == 'merged':
+            return pr.merged
+        else:
+            return pr.state == cv
 
     def _find_in_comments(self, comments, regex):
-        for page in comments:
-            for resource in page:
-                # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
-                if re.findall(regex, resource.body, re.MULTILINE):
-                    yield resource
+        for comment in comments:
+            # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
+            if re.findall(regex, comment.body, re.MULTILINE):
+                yield comment
 
     def check_plus(self, pr, cv=None):
         if getattr(pr, 'memo_comments', None) is None:
-            pr.memo_comments = gh.issues.comments.list(
-                pr.number, user=self.repo_owner, repo=self.repo_name)
+            pr.memo_comments = list(pr.get_comments())
 
         count = 0
         for plus1_comment in self._find_in_comments(pr.memo_comments, UPVOTE_REGEX):
@@ -155,13 +152,18 @@ class PullRequestFilter(object):
         return count
 
     def check_has_tag(self, pr, cv=None):
-        print dir(pr)
-        sys.exit()
+        # Tags aren't actually listed in the PR, we have to fetch the issue for that
+        m = re.compile(cv)
+        issue = self.repo.get_issue(pr.number)
+        for label in issue.get_labels():
+            if m.match(label.name):
+                return True
+
+        return False
 
     def check_minus(self, pr, cv=None):
         if getattr(pr, 'memo_comments', None) is None:
-            pr.memo_comments = gh.issues.comments.list(
-                pr.number, user=self.repo_owner, repo=self.repo_name)
+            pr.memo_comments = list(pr.get_comments())
 
         count = 0
         for minus1_comment in self._find_in_comments(pr.memo_comments, DOWNVOTE_REGEX):
@@ -171,31 +173,26 @@ class PullRequestFilter(object):
         return count
 
     def check_to_branch(self, pr, cv=None):
-        return pr.resource.base['ref'] == cv
+        return pr.base.ref == cv
 
     def check_created_at(self, pr, cv=None):
         created_at = pr.created_at
         return created_at
 
     def execute(self, pr, action):
-        if action['action'] != 'comment':
-            raise NotImplementedError("Action %s is not available" %
-                                      action['action'])
-
         log.info("Executing action")
         if self.dry_run:
             return
 
-        func = getattr(self, 'execute_' + action)
+        func = getattr(self, 'execute_' + action['action'])
         return func(pr, action)
 
     def execute_comment(self, pr, action):
-        if getattr(pr, '_comments', None) is None:
-            pr._comments = gh.issues.comments.list(
-                pr.number, user=self.repo_owner, repo=self.repo_name)
+        if getattr(pr, 'memo_comments', None) is None:
+            pr.memo_comments = list(pr.get_comments())
 
         comment_text = action['comment'].format(
-            author='@' + pr.user['login']
+            author='@' + pr.user.login
         ).strip().replace('\n', ' ')
 
         # Check if we've made this exact comment before, so we don't comment
@@ -211,35 +208,16 @@ class PullRequestFilter(object):
             return
 
         # Create the comment
-        gh.issues.comments.create(
-            pr.number,
-            comment_text,
-            user=self.repo_owner,
-            repo=self.repo_name,
+        pr.create_comment(
+            comment_text
         )
 
+    def execute_assign_next_milestone(self, pr, action):
+        # Can only update milestone through associated PR issue.
+        issue = self.repo.get_issue(pr.number)
+        issue.edit(milestone=self.next_milestone)
+        return
 
-class PullRequest(object):
-
-    def __init__(self, resource):
-        self.resource = resource
-
-        for key in ('number', 'title', 'updated_at', 'url', 'user', 'body',
-                    'created_at', 'state', 'id'):
-            setattr(self, key, getattr(self.resource, key, None))
-
-        log.info("Built PullRequest #%s %s", self.number, self.title)
-        # 'assignee', 'base', 'body', 'closed_at', 'comments_url',
-        # 'commits_url', 'created_at', 'diff_url', 'head', 'html_url', 'id',
-        # 'issue_url', 'loads', 'locked', 'merge_commit_sha', 'merged_at',
-        # 'milestone', 'number', 'patch_url', 'review_comment_url',
-        # 'review_comments_url', 'state', 'statuses_url', 'title',
-        # 'updated_at', 'url', 'user'
-
-    def __str__(self):
-        return '<#%s "%s" by @%s (https://github.com/%s/%s/pull/%s)>' % (
-            self.number, self.title, self.user['login'], 'galaxyproject',
-            'galaxy', self.number)
 
 
 class MergerBot(object):
@@ -254,19 +232,20 @@ class MergerBot(object):
 
         self.timefmt = "%Y-%m-%dT%H:%M:%S.Z"
 
+        self.repo_owner = self.config['repository']['owner']
+        self.repo_name = self.config['repository']['name']
+        self.repo = gh.get_repo(self.repo_owner + '/' + self.repo_name)
+
         self.pr_filters = []
-        log.debug(pprint.pformat(self.config['repository']))
         for rule in self.config['repository']['filters']:
             prf = PullRequestFilter(
                 name=rule['name'],
                 conditions=rule['conditions'],
                 actions=rule['actions'],
                 next_milestone=self.config['repository']['next_milestone'],
-
+                repo=self.repo,
                 # ugh
                 committer_group=self.config['repository']['pr_approvers'],
-                repo_owner=self.config['repository']['owner'],
-                repo_name=self.config['repository']['name'],
                 bot_user=self.config['meta']['bot_user'],
                 dry_run=self.dry_run,
             )
@@ -313,48 +292,36 @@ class MergerBot(object):
         self.conn.commit()
 
     def all_prs(self):
-        results = gh.pull_requests.list(
-            state='open',
-            user=self.config['repository']['owner'],
-            repo=self.config['repository']['name'])
-        for result in results:
+        yield self.repo.get_pull(1111)
+        return
+
+        results = self.repo.get_pulls(state='closed')
+        for i, result in enumerate(results):
             yield result
 
         return
 
-        results = gh.pull_requests.list(
-            state='merged',
-            user=self.config['repository']['owner'],
-            repo=self.config['repository']['name'])
+        results = self.repo.get_pulls(state='open')
         for result in results:
             yield result
-
-        results = gh.pull_requests.list(
-            state='closed',
-            user=self.config['repository']['owner'],
-            repo=self.config['repository']['name'])
-        for result in results:
-            yield result
-            break
 
     def get_modified_prs(self):
         # This will contain a list of all new/updated PRs to filter
         changed_prs = []
         # Loop across our GH results
-        for page in self.all_prs():
-            for resource in page:
-                # Fetch the PR's ID which we use as a key in our db.
-                cached_pr = self.fetch_pr_from_db(resource.id)
-                # If it's new, cache it.
-                if cached_pr is None:
-                    self.cache_pr(resource.id, resource.updated_at)
-                    changed_prs.append(PullRequest(resource))
-                else:
-                    # compare updated_at times.
-                    cached_pr_time = cached_pr[1]
-                    if cached_pr_time != resource.updated_at:
-                        log.debug('Cache says: %s last updated at %s', cached_pr_time, resource.updated_at)
-                        changed_prs.append(PullRequest(resource))
+        for resource in self.all_prs():
+            # Fetch the PR's ID which we use as a key in our db.
+            cached_pr = self.fetch_pr_from_db(resource.id)
+            # If it's new, cache it.
+            if cached_pr is None:
+                self.cache_pr(resource.id, resource.updated_at)
+                changed_prs.append(resource)
+            else:
+                # compare updated_at times.
+                cached_pr_time = cached_pr[1]
+                log.debug('[%s] Cache says: %s last updated at %s', resource.number, cached_pr_time, resource.updated_at)
+                if cached_pr_time != resource.updated_at or True:
+                    changed_prs.append(resource)
         return changed_prs
 
     def run(self):
