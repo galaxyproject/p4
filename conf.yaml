@@ -83,32 +83,31 @@ repository:
                         {author}'s PR has reached the required number of votes
                         for merging.
         -
-            name: Check merged PRs for review tag.
+            name: Check merged PRs for missing review tag.
             conditions:
                 - state: 'merged'
-                - created_at__ge: 'precise::2016'
+                - created_at__ge: 'precise::2015-10-01'
+                - has_tag__not: 'status/review'
             actions:
                 -
-                    action: assert_has_tag
-                    action_value: 'status/review'
+                    action: comment
                     comment: |
                         This PR was merged without a 'status/review' tag, please correct.
         -
-            name: Check merged PRs for a kind tag.
+            name: Check merged PRs for missing kind tag.
             conditions:
                 - state: 'merged'
-                - created_at__ge: 'precise::2016'
+                - created_at__ge: 'precise::2015-10-01'
+                - has_tag__not: 'kind/.*'
             actions:
                 -
-                    action: assert_has_tag__startswith
-                    action_value: 'kind/'
+                    action: comment
                     comment: |
                         This PR was merged without a 'kind/' tag, please correct.
         -
             name: Add status/review to new PRs.
             conditions:
-                - state: 'merged'
-                - created_at__ge: 'precise::2016-01-01'
+                - created_at__ge: 'precise::2015-10-01'
                 - state: 'open'
                 - title_contains__not: '[WIP]'
             actions:
@@ -118,8 +117,7 @@ repository:
         -
             name: Add status/WIP to new WIP PRs.
             conditions:
-                - state: 'merged'
-                - created_at__ge: 'precise::2016-01-01'
+                - created_at__ge: 'precise::2015-10-01'
                 - state: 'open'
                 - title_contains: 'WIP'
             actions:
@@ -127,20 +125,20 @@ repository:
                     action: assign_tag
                     action_value: 'status/WIP'
         -
-            name: Add next milesone.
+            name: Add next milestone.
             conditions:
                 - state: 'open'
-                - created_at__ge: 'precise::2016-01-01'
-                - milesone: null
+                - created_at__ge: 'precise::2015-10-01'
+                - milestone: null
             actions:
                 -
                     action: assign_next_milestone
         -
-            name: Assert has milestone.
+            name: Comment on missing milestones.
             conditions:
                 - state: 'merged'
-                - created_at__ge: 'precise::2016-01-01'
-                - milesone: null
+                - created_at__ge: 'precise::2015-10-01'
+                - milestone: null
             actions:
                 -
                     action: comment

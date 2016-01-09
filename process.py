@@ -216,8 +216,11 @@ class PullRequestFilter(object):
         # Can only update milestone through associated PR issue.
         issue = self.repo.get_issue(pr.number)
         issue.edit(milestone=self.next_milestone)
-        return
 
+    def execute_assign_tag(self, pr, action):
+        issue = self.repo.get_issue(pr.number)
+        tag_name = action['action_value']
+        issue.add_to_labels(tag_name)
 
 
 class MergerBot(object):
@@ -292,7 +295,7 @@ class MergerBot(object):
         self.conn.commit()
 
     def all_prs(self):
-        yield self.repo.get_pull(1111)
+        yield self.repo.get_pull(852)
         return
 
         results = self.repo.get_pulls(state='closed')
