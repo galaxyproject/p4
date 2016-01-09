@@ -25,8 +25,9 @@ DOWNVOTE_REGEX = '(:\-1:|^\s*\-1\s*$)'
 
 class PullRequestFilter(object):
 
-    def __init__(self, name, conditions, actions, committer_group=None, repo_owner=None,
-                 repo_name=None, bot_user=None, dry_run=False, next_milestone=None):
+    def __init__(self, name, conditions, actions, committer_group=None,
+                 repo_owner=None, repo_name=None, bot_user=None,
+                 dry_run=False, next_milestone=None):
         self.name = name
         self.conditions = conditions
         self.actions = actions
@@ -126,6 +127,11 @@ class PullRequestFilter(object):
     def check_title_contains(self, pr, cv=None):
         return cv in pr.title
 
+    def check_milestone(self, pr, cv=None):
+        print dir(pr), cv, pr.url
+        import sys
+        sys.exit()
+
     def check_state(self, pr, cv=None):
         return pr.state == cv
 
@@ -147,6 +153,10 @@ class PullRequestFilter(object):
                 count += 1
 
         return count
+
+    def check_has_tag(self, pr, cv=None):
+        print dir(pr)
+        sys.exit()
 
     def check_minus(self, pr, cv=None):
         if getattr(pr, 'memo_comments', None) is None:
@@ -311,6 +321,13 @@ class MergerBot(object):
             yield result
 
         return
+
+        results = gh.pull_requests.list(
+            state='merged',
+            user=self.config['repository']['owner'],
+            repo=self.config['repository']['name'])
+        for result in results:
+            yield result
 
         results = gh.pull_requests.list(
             state='closed',
