@@ -33,8 +33,6 @@ class PullRequestFilter(object):
         self.repo = repo
         self.bot_user = bot_user
         self.dry_run = dry_run
-        self.milestones = list(self.repo.get_milestones())
-        self.next_milestone = [x for x in self.milestones if x.title == next_milestone][0]
         log.info("Registered PullRequestFilter %s", name)
 
     def condition_it(self):
@@ -240,12 +238,16 @@ class MergerBot(object):
         self.repo = gh.get_repo(self.repo_owner + '/' + self.repo_name)
 
         self.pr_filters = []
+        self.next_milestone = [
+            milestone for milestone in self.repo.get_milestones() if
+            milestone.title == self.config['repository']['next_milestone']][0]
+
         for rule in self.config['repository']['filters']:
             prf = PullRequestFilter(
                 name=rule['name'],
                 conditions=rule['conditions'],
                 actions=rule['actions'],
-                next_milestone=self.config['repository']['next_milestone'],
+                next_milestone=self.next_milestone,
                 repo=self.repo,
                 # ugh
                 committer_group=self.config['repository']['pr_approvers'],
