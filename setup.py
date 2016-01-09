@@ -5,7 +5,7 @@ setup(name="p4",
       description="proper prior planning...",
       author="Eric Rasche",
       author_email="esr@tamu.edu",
-      install_requires=['pygithub3', 'pyyaml', 'parsedatetime'],
+      install_requires=['PyGithub', 'pyyaml', 'parsedatetime', 'python-dateutil'],
       tests_require=['nose', 'attrdict'],
       license='GPL3'
       )
