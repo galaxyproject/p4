@@ -1,3 +1,4 @@
-pygithub3
+PyGithub
 pyyaml
 parsedatetime
+python-dateutil
