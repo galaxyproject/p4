@@ -317,8 +317,8 @@ class MergerBot(object):
             else:
                 # compare updated_at times.
                 cached_pr_time = cached_pr[1]
-                log.debug('[%s] Cache says: %s last updated at %s', resource.number, cached_pr_time, resource.updated_at)
-                if cached_pr_time != resource.updated_at or True:
+                if cached_pr_time != resource.updated_at:
+                    log.debug('[%s] Cache says: %s last updated at %s', resource.number, cached_pr_time, resource.updated_at)
                     changed_prs.append(resource)
         return changed_prs
 
