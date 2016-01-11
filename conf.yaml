@@ -1,10 +1,11 @@
 meta:
     database_path: ./cache.sqlite
-    bot_user: erasche
+    bot_user: galaxybot
 
 repository:
     owner: galaxyproject
     name: galaxy
+    next_milestone: "16.04"
     # List of people whose +1/-1 votes actually count
     pr_approvers:
         - martenson
@@ -45,7 +46,7 @@ repository:
                 - title_contains: '[PROCEDURES]'
                 - title_contains__not: '[WIP]'
                 # And the PR is older than 168 hours ago
-                - older_than: 168 hours ago
+                - created_at__ge: 'relative::168 hours ago'
                 # With 5 or more :+1: votes
                 - plus__ge: 5
                 # And ZERO :-1: votes
@@ -81,3 +82,65 @@ repository:
                     comment: |
                         {author}'s PR has reached the required number of votes
                         for merging.
+        -
+            name: Check merged PRs for missing review tag.
+            conditions:
+                - state: 'merged'
+                - created_at__ge: 'precise::2015-10-01'
+                - has_tag__not: 'status/review'
+            actions:
+                -
+                    action: comment
+                    comment: |
+                        This PR was merged without a 'status/review' tag, please correct.
+        -
+            name: Check merged PRs for missing kind tag.
+            conditions:
+                - state: 'merged'
+                - created_at__ge: 'precise::2015-10-01'
+                - has_tag__not: 'kind/.*'
+            actions:
+                -
+                    action: comment
+                    comment: |
+                        This PR was merged without a 'kind/' tag, please correct.
+        -
+            name: Add status/review to new PRs.
+            conditions:
+                - created_at__ge: 'precise::2015-10-01'
+                - state: 'open'
+                - title_contains__not: '[WIP]'
+            actions:
+                -
+                    action: assign_tag
+                    action_value: 'status/review'
+        -
+            name: Add status/WIP to new WIP PRs.
+            conditions:
+                - created_at__ge: 'precise::2015-10-01'
+                - state: 'open'
+                - title_contains: 'WIP'
+            actions:
+                -
+                    action: assign_tag
+                    action_value: 'status/WIP'
+        -
+            name: Add next milestone.
+            conditions:
+                - state: 'open'
+                - created_at__ge: 'precise::2015-10-01'
+                - milestone: null
+            actions:
+                -
+                    action: assign_next_milestone
+        -
+            name: Comment on missing milestones.
+            conditions:
+                - state: 'merged'
+                - created_at__ge: 'precise::2015-10-01'
+                - milestone: null
+            actions:
+                -
+                    action: comment
+                    comment: |
+                        This PR was merged without a milestone attached.

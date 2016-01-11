@@ -2,53 +2,95 @@
 import os
 import re
 import yaml
-from pygithub3 import Github
+from github import Github
 import sqlite3
 import datetime
+from dateutil import parser as dtp
 import parsedatetime
+import argparse
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger()
+logging.getLogger('github').setLevel(logging.INFO)
 
 gh = Github(
-    login=os.environ.get('GITHUB_USERNAME', None),
-    password=os.environ.get('GITHUB_PASSWORD', None)
+    login_or_token=os.environ.get('GITHUB_USERNAME', None) or os.environ.get('GITHUB_OAUTH_TOKEN', None),
+    password=os.environ.get('GITHUB_PASSWORD', None),
 )
+
+UPVOTE_REGEX = '(:\+1:|^\s*\+1\s*$)'
+DOWNVOTE_REGEX = '(:\-1:|^\s*\-1\s*$)'
 
 
 class PullRequestFilter(object):
 
-    def __init__(self, name, conditions, actions, committer_group=None, repo_owner=None,
-                 repo_name=None, bot_user=None):
+    def __init__(self, name, conditions, actions, committer_group=None,
+                 bot_user=None, dry_run=False, next_milestone=None, repo=None):
         self.name = name
         self.conditions = conditions
         self.actions = actions
         self.committer_group = [] if committer_group is None else committer_group
-        self.repo_owner = repo_owner
-        self.repo_name = repo_name
+        self.repo = repo
         self.bot_user = bot_user
+        self.dry_run = dry_run
         log.info("Registered PullRequestFilter %s", name)
 
-    def condition_it(self):
+    def _condition_it(self):
         for condition_dict in self.conditions:
             for key in condition_dict:
                 yield (key, condition_dict[key])
 
     def apply(self, pr):
-        for (condition_key, condition_value) in self.condition_it():
-            log.debug("[%s] Evaluating %s %s for %s", self.name, condition_key, condition_value, pr)
-            if not self.evaluate(pr, condition_key, condition_value):
+        """Apply a given PRF to a given PR. Causes all appropriate conditions
+        to be evaluated for a PR, and then the appropriate actions to be
+        executed
+        """
+        log.debug("\t[%s]", self.name)
+        for (condition_key, condition_value) in self._condition_it():
+            res = self.evaluate(pr, condition_key, condition_value)
+            log.debug("\t\t%s, %s => %s", condition_key, condition_value, res)
+
+            if not res:
                 return
 
         log.info("Matched %s", pr)
-
         # If we've made it this far, we pass ALL conditions
         for action in self.actions:
             self.execute(pr, action)
 
         return True
 
+    def _time_to_int(self, result, condition_value):
+        # Times we shoe-horn into numeric types.
+        # Since condition_value is a string, we have to have some special
+        # logic for correcting it into a time
+        (date_type, date_string) = condition_value.split('::', 1)
+        if date_type == 'relative':
+            # Get the current time, adjusted for strings like "168
+            # hours ago"
+            current = datetime.datetime.now()
+            calendar = parsedatetime.Calendar()
+            compare_against, parsed_as = calendar.parseDT(date_string, current)
+        elif date_type == 'precise':
+            compare_against = dtp.parse(date_string)
+        else:
+            raise Exception("Unknown date string type. Please use 'precise::2016-01-01' or 'relative::yesterday'")
+
+        # Now we update the result to be the total number of seconds
+        result = (result - compare_against).total_seconds()
+        # And condition value to zero
+        condition_value = 0
+        # As a result, all of the math in evaluate() works.
+        return result, condition_value
+
     def evaluate(self, pr, condition_key, condition_value):
+        """Evaluate a condition like "title_contains" or "plus__ge".
+
+        The condition_key maps to a function such as "check_title_contains" or "check_plus"
+        If there is a '__X' that maps to a comparator function which is
+        then used to evlauate the result.
+        """
+
         # Some conditions contain an aditional operation we must respect, e.g.
         # __gt or __eq
         if '__' in condition_key:
@@ -59,10 +101,13 @@ class PullRequestFilter(object):
         func = getattr(self, 'check_' + condition_key)
         result = func(pr, cv=condition_value)
 
+        if condition_key == 'created_at':
+            result, condition_value = self._time_to_int(result, condition_value)
+
         # There are two types of conditions, text and numeric.
         # Numeric conditions are only appropriate for the following types:
-        # 1) plus, 2) minus
-        if condition_key in ('plus', 'minus'):
+        # 1) plus, 2) minus, 3) times which were hacked in
+        if condition_key in ('plus', 'minus', 'created_at'):
             if condition_op == 'gt':
                 return int(result) > int(condition_value)
             elif condition_op == 'ge':
@@ -85,68 +130,94 @@ class PullRequestFilter(object):
                 return result
 
     def check_title_contains(self, pr, cv=None):
+        """condition_value in pr.title
+        """
         return cv in pr.title
 
+    def check_milestone(self, pr, cv=None):
+        """condition_value == pr.milestone
+        """
+        return pr.milestone == cv
+
     def check_state(self, pr, cv=None):
-        return pr.state == cv
+        """checks if state == one of cv in (open, closed, merged)
+        """
+        if cv == 'merged':
+            return pr.merged
+        else:
+            return pr.state == cv
 
     def _find_in_comments(self, comments, regex):
-        for page in comments:
-            for resource in page:
-                log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
-                if re.findall(regex, resource.body, re.MULTILINE):
-                    yield resource
+        """Search for hits to a regex in a list of comments
+        """
+        for comment in comments:
+            # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
+            if re.findall(regex, comment.body, re.MULTILINE):
+                yield comment
 
     def check_plus(self, pr, cv=None):
         if getattr(pr, 'memo_comments', None) is None:
-            pr.memo_comments = gh.issues.comments.list(
-                pr.number, user=self.repo_owner, repo=self.repo_name)
+            pr.memo_comments = list(pr.get_comments())
 
         count = 0
-        for plus1_comment in self._find_in_comments(pr.memo_comments, '(:\+1:|^\s*\+1\s*$)'):
+        for plus1_comment in self._find_in_comments(pr.memo_comments, UPVOTE_REGEX):
             if plus1_comment.user.login in self.committer_group:
                 count += 1
 
         return count
 
+    def check_has_tag(self, pr, cv=None):
+        """Checks that at least one tag matches the regex provided in condition_value
+        """
+        # Tags aren't actually listed in the PR, we have to fetch the issue for that
+        m = re.compile(cv)
+        issue = self.repo.get_issue(pr.number)
+        for label in issue.get_labels():
+            if m.match(label.name):
+                return True
+
+        return False
+
     def check_minus(self, pr, cv=None):
         if getattr(pr, 'memo_comments', None) is None:
-            pr.memo_comments = gh.issues.comments.list(
-                pr.number, user=self.repo_owner, repo=self.repo_name)
+            pr.memo_comments = list(pr.get_comments())
 
         count = 0
-        for minus1_comment in self._find_in_comments(pr.memo_comments, '(:-1:|^\s*-1\s*$)'):
+        for minus1_comment in self._find_in_comments(pr.memo_comments, DOWNVOTE_REGEX):
             if minus1_comment.user.login in self.committer_group:
                 count += 1
 
         return count
 
     def check_to_branch(self, pr, cv=None):
-        return pr.resource.base['ref'] == cv
+        return pr.base.ref == cv
 
-    def check_older_than(self, pr, cv=None):
-        created_at = pr.created_at
-        current = datetime.datetime.now()
+    def check_created_at(self, pr, cv=None):
+        """Due to condition_values with times, check_created_at simply returns pr.created_at
 
-        calendar = parsedatetime.Calendar()
-        current_adjusted, parsed_as = calendar.parseDT(cv, current)
-
-        return (created_at - current_adjusted).total_seconds() < 0
+        Other math must be done to correctly check time. See _time_to_int
+        """
+        return pr.created_at
 
     def execute(self, pr, action):
-        if action['action'] != 'comment':
-            raise NotImplementedError("Action %s is not available" %
-                                      action['action'])
+        """Execute an action by name.
+        """
+        log.info("Executing action")
+        if self.dry_run:
+            return
+
+        func = getattr(self, 'execute_' + action['action'])
+        return func(pr, action)
+
+    def execute_comment(self, pr, action):
+        """Commenting action, generates a comment on the parent PR
+        """
+        if getattr(pr, 'memo_comments', None) is None:
+            pr.memo_comments = list(pr.get_comments())
 
         comment_text = action['comment'].format(
-            author='@' + pr.user['login']
+            author='@' + pr.user.login
         ).strip().replace('\n', ' ')
-
-        log.info("Executing action")
-
-        if getattr(pr, '_comments', None) is None:
-            pr._comments = gh.issues.comments.list(
-                pr.number, user=self.repo_owner, repo=self.repo_name)
 
         # Check if we've made this exact comment before, so we don't comment
         # multiple times and annoy people.
@@ -161,42 +232,29 @@ class PullRequestFilter(object):
             return
 
         # Create the comment
-        gh.issues.comments.create(
-            pr.number,
-            comment_text,
-            user=self.repo_owner,
-            repo=self.repo_name,
+        pr.create_comment(
+            comment_text
         )
 
-        return True
+    def execute_assign_next_milestone(self, pr, action):
+        """Assigns a pr's milestone to next_milestone
+        """
+        # Can only update milestone through associated PR issue.
+        issue = self.repo.get_issue(pr.number)
+        issue.edit(milestone=self.next_milestone)
 
-
-class PullRequest(object):
-
-    def __init__(self, resource):
-        self.resource = resource
-
-        for key in ('number', 'title', 'updated_at', 'url', 'user', 'body',
-                    'created_at', 'state', 'id'):
-            setattr(self, key, getattr(self.resource, key, None))
-
-        log.info("Built PullRequest #%s %s", self.number, self.title)
-        # 'assignee', 'base', 'body', 'closed_at', 'comments_url',
-        # 'commits_url', 'created_at', 'diff_url', 'head', 'html_url', 'id',
-        # 'issue_url', 'loads', 'locked', 'merge_commit_sha', 'merged_at',
-        # 'milestone', 'number', 'patch_url', 'review_comment_url',
-        # 'review_comments_url', 'state', 'statuses_url', 'title',
-        # 'updated_at', 'url', 'user'
-
-    def __str__(self):
-        return '<#%s "%s" by @%s (https://github.com/%s/%s/pull/%s)>' % (
-            self.number, self.title, self.user['login'], self.repo_owner,
-            self.repo_name, self.number)
+    def execute_assign_tag(self, pr, action):
+        """Tags a PR
+        """
+        issue = self.repo.get_issue(pr.number)
+        tag_name = action['action_value']
+        issue.add_to_labels(tag_name)
 
 
 class MergerBot(object):
 
-    def __init__(self, conf_path):
+    def __init__(self, conf_path, dry_run=False):
+        self.dry_run = dry_run
         with open(conf_path, 'r') as handle:
             self.config = yaml.load(handle)
 
@@ -205,22 +263,30 @@ class MergerBot(object):
 
         self.timefmt = "%Y-%m-%dT%H:%M:%S.Z"
 
+        self.repo_owner = self.config['repository']['owner']
+        self.repo_name = self.config['repository']['name']
+        self.repo = gh.get_repo(self.repo_owner + '/' + self.repo_name)
+
         self.pr_filters = []
+        self.next_milestone = [
+            milestone for milestone in self.repo.get_milestones() if
+            milestone.title == self.config['repository']['next_milestone']][0]
+
         for rule in self.config['repository']['filters']:
             prf = PullRequestFilter(
                 name=rule['name'],
                 conditions=rule['conditions'],
                 actions=rule['actions'],
-
-                # ugh
+                next_milestone=self.next_milestone,
+                repo=self.repo,
                 committer_group=self.config['repository']['pr_approvers'],
-                repo_owner=self.config['repository']['owner'],
-                repo_name=self.config['repository']['name'],
                 bot_user=self.config['meta']['bot_user'],
+                dry_run=self.dry_run,
             )
             self.pr_filters.append(prf)
 
     def create_db(self, database_name='cache.sqlite'):
+        """Create the database if it doesn't exist"""
         self.conn = sqlite3.connect(database_name)
         cursor = self.conn.cursor()
         cursor.execute(
@@ -233,6 +299,7 @@ class MergerBot(object):
         )
 
     def fetch_pr_from_db(self, id):
+        """select PR from database cache by PR #"""
         cursor = self.conn.cursor()
         cursor.execute("""SELECT * FROM pr_data WHERE pr_id == ?""", (str(id), ))
         row = cursor.fetchone()
@@ -247,50 +314,74 @@ class MergerBot(object):
         return pretty_row
 
     def cache_pr(self, id, updated_at):
+        """Store the PR in the DB cache, along with the last-updated
+        date"""
         cursor = self.conn.cursor()
         cursor.execute("""INSERT INTO pr_data VALUES (?, ?)""",
                        (str(id), updated_at.strftime(self.timefmt)))
         self.conn.commit()
 
     def update_pr(self, id, updated_at):
+        """Update the PR date in the cache"""
+        if self.dry_run:
+            return
         cursor = self.conn.cursor()
         cursor.execute("""UPDATE pr_data SET updated_at = ? where pr_id = ?""",
                        (updated_at.strftime(self.timefmt), str(id)))
         self.conn.commit()
 
-    def get_prs2(self):
-        results = gh.pull_requests.list(
-            state='open',
-            user=self.config['repository']['owner'],
-            repo=self.config['repository']['name'])
-        # This will contain a list of all new/updated PRs to filter
+    def all_prs(self):
+        """List all open PRs in the repo.
+
+        This... needs work. As it is it fetches EVERY PR, open and closed
+        and that's a monotonically increasing number of API requests per
+        run. Suboptimal.
+        """
+        results = self.repo.get_pulls(state='closed')
+        for i, result in enumerate(results):
+            yield result
+
+        results = self.repo.get_pulls(state='open')
+        for result in results:
+            yield result
+
+    def get_modified_prs(self):
+        """This will contain a list of all new/updated PRs to filter
+        """
         changed_prs = []
         # Loop across our GH results
-        for page in results:
-            for resource in page:
-                # Fetch the PR's ID which we use as a key in our db.
-                cached_pr = self.fetch_pr_from_db(resource.id)
-                # If it's new, cache it.
-                if cached_pr is None:
-                    self.cache_pr(resource.id, resource.updated_at)
-                    changed_prs.append(PullRequest(resource))
-                else:
-                    # compare updated_at times.
-                    cached_pr_time = cached_pr[1]
-                    log.debug(cached_pr_time, resource.updated_at)
-                    if cached_pr_time != resource.updated_at:
-                        changed_prs.append(PullRequest(resource))
+        for resource in self.all_prs():
+            # Fetch the PR's ID which we use as a key in our db.
+            cached_pr = self.fetch_pr_from_db(resource.id)
+            # If it's new, cache it.
+            if cached_pr is None:
+                self.cache_pr(resource.id, resource.updated_at)
+                changed_prs.append(resource)
+            else:
+                # compare updated_at times.
+                cached_pr_time = cached_pr[1]
+                if cached_pr_time != resource.updated_at:
+                    log.debug('[%s] Cache says: %s last updated at %s', resource.number, cached_pr_time, resource.updated_at)
+                    changed_prs.append(resource)
         return changed_prs
 
     def run(self):
-        changed_prs = self.get_prs2()
+        """Find modified PRs, apply the PR filter, and execute associated
+        actions"""
+        changed_prs = self.get_modified_prs()
         log.info("Found %s PRs to examine", len(changed_prs))
         for changed in changed_prs:
+
+            log.debug("Evaluating %s", changed)
             for pr_filter in self.pr_filters:
                 pr_filter.apply(changed)
                 self.update_pr(changed.id, changed.updated_at)
 
 
 if __name__ == '__main__':
-    bot = MergerBot('conf.yaml')
+    parser = argparse.ArgumentParser(description='P4 bot')
+    parser.add_argument('--dry-run', dest='dry_run', action='store_true')
+    args = parser.parse_args()
+
+    bot = MergerBot('conf.yaml', **vars(args))
     bot.run()

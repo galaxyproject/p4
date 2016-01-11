@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
-from process import PullRequestFilter
+from process import PullRequestFilter, UPVOTE_REGEX, DOWNVOTE_REGEX
 import datetime
 import parsedatetime
 from attrdict import AttrDict
@@ -16,23 +16,33 @@ class TestPullRequestFilter(unittest.TestCase):
         adj, parsed_as = calendar.parseDT(relative, datetime.datetime.now())
         return adj
 
-    def test_check_older_than(self):
+    def test_created_at(self):
         prf = PullRequestFilter("test_filter", [], [])
         fakepr = AttrDict({
             'created_at': self._get_dt_from_relative("1 day ago")
         })
 
         self.assertFalse(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="7 days ago"
+                'created_at__lt',
+                "relative::7 days ago"
             )
         )
 
         self.assertTrue(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="tomorrow"
+                'created_at__gt',
+                "precise::2016-01-01",
+            )
+        )
+
+        self.assertTrue(
+            prf.evaluate(
+                fakepr,
+                'created_at__lt',
+                "relative::tomorrow"
             )
         )
 
@@ -42,9 +52,10 @@ class TestPullRequestFilter(unittest.TestCase):
         })
 
         self.assertTrue(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="7 days ago"
+                'created_at__lt',
+                "relative::7 days ago"
             )
         )
 
@@ -54,26 +65,26 @@ class TestPullRequestFilter(unittest.TestCase):
         })
 
         self.assertTrue(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="today"
+                'created_at__lt',
+                "relative::today"
             )
         )
 
         self.assertFalse(
-            prf.check_older_than(
+            prf.evaluate(
                 fakepr,
-                cv="2 days ago"
+                'created_at__lt',
+                "relative::2 days ago"
             )
         )
 
     def test_check_to_branch(self):
         prf = PullRequestFilter("test_filter", [], [])
         fakepr = AttrDict({
-            'resource': {
-                'base': {
-                    'ref': 'dev'
-                }
+            'base': {
+                'ref': 'dev'
             }
         })
 
@@ -130,6 +141,7 @@ class TestPullRequestFilter(unittest.TestCase):
                 cv="anything-else"
             )
         )
+
     def test_pr_evaluate(self):
         prf = PullRequestFilter("test_filter", [], [])
         fakepr = AttrDict({
@@ -146,35 +158,37 @@ class TestPullRequestFilter(unittest.TestCase):
         self.assertTrue(
             prf.evaluate(
                 fakepr,
-                'older_than__not',
-                '3 days ago',
+                'created_at__ge',
+                'relative::3 days ago',
             )
         )
 
         self.assertTrue(
             prf.evaluate(
                 fakepr,
-                'older_than',
-                'today',
+                'created_at__lt',
+                'relative::today',
             )
         )
 
     def test_find_in_comments(self):
         prf = PullRequestFilter("test_filter", [], [])
         comments_container = [
-            [[AttrDict({'body': '+1', 'expect': True})]],
-            [[AttrDict({'body': ':+1:', 'expect': True})]],
-            [[AttrDict({'body': 'asdf +1 asdf', 'expect': False})]],
-            [[AttrDict({'body': 'asdf :+1: asdf', 'expect': True})]],
-            [[AttrDict({'body': 'asdf\n+1\nasdf', 'expect': True})]],
-            [[AttrDict({'body': 'asdf\n:+1:\nasdf', 'expect': True})]],
+            [AttrDict({'body': '+1', 'expect': True})],
+            [AttrDict({'body': ':+1:', 'expect': True})],
+            [AttrDict({'body': 'asdf +1 asdf', 'expect': False})],
+            [AttrDict({'body': 'asdf :+1: asdf', 'expect': True})],
+            [AttrDict({'body': 'asdf\n+1\nasdf', 'expect': True})],
+            [AttrDict({'body': 'asdf\n:+1:\nasdf', 'expect': True})],
+            [AttrDict({'body': """Yeah, dunno about travis either, but I'm a bit nervous to break the build for everyone else.
+You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect': True})],
         ]
         for x in comments_container:
-            result = len(list(prf._find_in_comments(x, '(:\+1:|^\s*\+1\s*$)'))) > 0,
+            result = len(list(prf._find_in_comments(x, UPVOTE_REGEX))) > 0,
             self.assertEquals(
                 result[0],
-                x[0][0]['expect'],
-                msg="body: '%s' did not produce the expected result." % x[0][0]['body']
+                x[0]['expect'],
+                msg="body: '%s' did not produce the expected result." % x[0]['body']
             )
 
     def test_check_minus_member(self):
@@ -192,7 +206,7 @@ class TestPullRequestFilter(unittest.TestCase):
         for case in test_cases:
             tmppr = AttrDict({
                 'state': 'open',
-                'memo_comments': [[case]]
+                'memo_comments': [case]
             })
 
             self.assertEquals(
@@ -218,7 +232,7 @@ class TestPullRequestFilter(unittest.TestCase):
         for case in test_cases:
             tmppr = AttrDict({
                 'state': 'open',
-                'memo_comments': [[case]]
+                'memo_comments': [case]
             })
 
             self.assertEquals(
@@ -239,12 +253,15 @@ class TestPullRequestFilter(unittest.TestCase):
             {'body': 'asdf  :+1: asdf', 'user': {'login': 'erasche'}, 'counts': 1},
             {'body': 'asdf\n +1\n asdf', 'user': {'login': 'erasche'}, 'counts': 1},
             {'body': 'asdf\n:+1:\nasdf', 'user': {'login': 'erasche'}, 'counts': 1},
+            {'body': """Yeah, dunno about travis either, but I'm a bit nervous to break the build for everyone else.
+             You have my :+1:, but I'd like a second pair of eyes merging this.""",
+             'counts': 1, 'user': {'login': 'erasche'}},
         ]
 
         for case in test_cases:
             tmppr = AttrDict({
                 'state': 'open',
-                'memo_comments': [[case]]
+                'memo_comments': [case]
             })
 
             self.assertEquals(
@@ -270,7 +287,7 @@ class TestPullRequestFilter(unittest.TestCase):
         for case in test_cases:
             tmppr = AttrDict({
                 'state': 'open',
-                'memo_comments': [[case]]
+                'memo_comments': [case]
             })
 
             self.assertEquals(
@@ -289,8 +306,8 @@ class TestPullRequestFilter(unittest.TestCase):
                 'title_contains': '[PROCEDURES]',
                 'title_contains__not': 'Blah',
                 'to_branch': 'dev',
-                'older_than': '0 days ago',
-                'older_than__not': '2 days ago',
+                'created_at__lt': 'relative::0 days ago',
+                'created_at__ge': 'relative::2 days ago',
             },
             []
         )
@@ -298,10 +315,8 @@ class TestPullRequestFilter(unittest.TestCase):
         fakepr = AttrDict({
             u'title': u'[PROCEDURES] Testing…',
             u'state': u'open',
-            u'resource': {
-                u'base': {
-                    u'ref': u'dev'
-                }
+            u'base': {
+                u'ref': u'dev'
             },
             u'created_at': self._get_dt_from_relative("1 day ago")
         })
@@ -314,21 +329,21 @@ class TestPullRequestFilter(unittest.TestCase):
             "test_filter",
             [
                 {'state': 'open', 'title_contains': '[PROCEDURES]'},
-                {'to_branch': 'dev', 'older_than': '0 days ago'},
+                {'to_branch': 'dev', 'created_at__lt': 'relative::0 days ago'},
                 {'title_contains__not': 'Blah'},
-                {'older_than__not': '2 days ago'},
+                {'created_at__ge': 'relative::2 days ago'},
             ],
             []
         )
 
         self.assertEquals(
-            sorted(list(prf.condition_it())),
+            sorted(list(prf._condition_it())),
             sorted([
                 ('state', 'open'),
                 ('title_contains', '[PROCEDURES]'),
                 ('title_contains__not', 'Blah'),
                 ('to_branch', 'dev'),
-                ('older_than', '0 days ago'),
-                ('older_than__not', '2 days ago'),
+                ('created_at__lt', 'relative::0 days ago'),
+                ('created_at__ge', 'relative::2 days ago'),
             ])
         )
