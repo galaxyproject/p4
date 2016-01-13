@@ -184,7 +184,17 @@ class TestPullRequestFilter(unittest.TestCase):
 You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect': True})],
         ]
         for x in comments_container:
-            result = len(list(prf._find_in_comments(x, UPVOTE_REGEX))) > 0,
+            # Get comments needs to return a callable, so we shoehorn in a
+            # closure to return 'x'
+            def q():
+                return x
+
+            # Then set up as function on fpr. There's probably an easier way to
+            # do this?
+            fpr = AttrDict({
+                'get_comments': q
+            })
+            result = len(list(prf._find_in_comments(fpr, UPVOTE_REGEX))) > 0,
             self.assertEquals(
                 result[0],
                 x[0]['expect'],
