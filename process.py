@@ -18,6 +18,9 @@ gh = Github(
     password=os.environ.get('GITHUB_PASSWORD', None),
 )
 
+log.warn("GH API RATE LIMIT: %s/%s" % gh.rate_limiting)
+
+
 UPVOTE_REGEX = '(:\+1:|^\s*\+1\s*$)'
 DOWNVOTE_REGEX = '(:\-1:|^\s*\-1\s*$)'
 
