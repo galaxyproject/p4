@@ -109,6 +109,9 @@ repository:
             conditions:
                 - created_at__ge: 'precise::2016-01-01'
                 - state: 'open'
+                    # This probably isn't perfect, but it'll be better
+                - has_tag__not: 'kind/.*'
+                - has_tag__not: 'status/.*'
                 - title_contains__not: '[WIP]'
             actions:
                 -
