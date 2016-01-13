@@ -84,20 +84,8 @@ repository:
                     comment: |
                         {author}'s PR has reached the required number of votes
                         for merging.
-        -
-            # According to Galaxy's Issues.rst as of 16.01,
-            # https://github.com/galaxyproject/galaxy/blob/release_16.01/doc/source/project/issues.rst
-            # All PRs will pass through a status/review phase.
-            name: Check merged PRs for missing review tag.
-            conditions:
-                - state: 'merged'
-                - created_at__ge: 'precise::2016-01-01'
-                - has_tag__not: 'status/review'
-            actions:
-                -
-                    action: comment
-                    comment: |
-                        This PR was merged without a 'status/review' tag, please correct.
+        # The following rules are loosely based on:
+        # https://github.com/galaxyproject/galaxy/blob/release_16.01/doc/source/project/issues.rst
         -
             name: Check merged PRs for missing kind tag.
             conditions:
