@@ -53,7 +53,7 @@ class PullRequestFilter(object):
             if not res:
                 return
 
-        log.info("Matched %s", pr)
+        log.info("Matched %s", pr.id)
         # If we've made it this far, we pass ALL conditions
         for action in self.actions:
             self.execute(pr, action)
