@@ -373,7 +373,7 @@ class MergerBot(object):
         log.info("Found %s PRs to examine", len(changed_prs))
         for changed in changed_prs:
 
-            log.debug("Evaluating %s", changed)
+            log.debug("Evaluating %s", changed.id)
             for pr_filter in self.pr_filters:
                 pr_filter.apply(changed)
                 self.update_pr(changed.id, changed.updated_at)
