@@ -147,22 +147,20 @@ class PullRequestFilter(object):
         else:
             return pr.state == cv
 
-    def _find_in_comments(self, comments, regex):
+    def _find_in_comments(self, pr, regex):
         """Search for hits to a regex in a list of comments
         """
-        if comments is not None:
-            print type(comments)
-            for comment in comments:
-                # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
-                if re.findall(regex, comment.body, re.MULTILINE):
-                    yield comment
-
-    def check_plus(self, pr, cv=None):
         if getattr(pr, 'memo_comments', None) is None:
             pr.memo_comments = list(pr.get_comments())
 
+        for comment in pr.memo_comments:
+            # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
+            if re.findall(regex, comment.body, re.MULTILINE):
+                yield comment
+
+    def check_plus(self, pr, cv=None):
         count = 0
-        for plus1_comment in self._find_in_comments(pr.memo_comments, UPVOTE_REGEX):
+        for plus1_comment in self._find_in_comments(pr, UPVOTE_REGEX):
             if plus1_comment.user.login in self.committer_group:
                 count += 1
 
@@ -181,11 +179,8 @@ class PullRequestFilter(object):
         return False
 
     def check_minus(self, pr, cv=None):
-        if getattr(pr, 'memo_comments', None) is None:
-            pr.memo_comments = list(pr.get_comments())
-
         count = 0
-        for minus1_comment in self._find_in_comments(pr.memo_comments, DOWNVOTE_REGEX):
+        for minus1_comment in self._find_in_comments(pr, DOWNVOTE_REGEX):
             if minus1_comment.user.login in self.committer_group:
                 count += 1
 
@@ -224,7 +219,7 @@ class PullRequestFilter(object):
         # Check if we've made this exact comment before, so we don't comment
         # multiple times and annoy people.
         for possible_bot_comment in self._find_in_comments(
-            pr._comments, comment_text):
+            pr, comment_text):
 
             if possible_bot_comment.user.login == self.bot_user:
                 log.info("Comment action previously applied, not duplicating")
