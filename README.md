@@ -23,23 +23,30 @@ followed for merging of PRs.
 ## Example Run
 
 Our first run we watch the bot find a PR (#1), and evaluate a number of states.
-It finds that the PR is open, it doesn't contain `[PROCEDURES]`, and that it
-has one or more `:+1:` votes (emoji required)
+It finds that the PR is:
+
+- open
+- it doesn't contain `[PROCEDURES]` or `[WIP]`,
+- and that it has one or more `:+1:` votes (+1 is accepted if on a line by itself)
+- that the PR was created more than a day ago
+
+when all these conditions pass, the bot tags the PR
 
 ```log
 (env)hxr@leda:~/work/p4$ python process.py
-INFO:root:Registered PullRequestFilter Check PRs to dev for mergability
-INFO:requests.packages.urllib3.connectionpool:Starting new HTTPS connection (1): api.github.com
-DEBUG:requests.packages.urllib3.connectionpool:"GET /repos/erasche/gx-package-caching/pulls?per_page=100&state=open&page=1 HTTP/1.1" 200 None
-INFO:root:Built PullRequest #1 Testing change for p4
-DEBUG:root:Found 1 PRs to examine
-DEBUG:root:[Check PRs to dev for mergability] Evaluating state open for <#1 "Testing change for p4" by @erasche>
-DEBUG:root:[Check PRs to dev for mergability] Evaluating title_contains__not [PROCEDURES] for <#1 "Testing change for p4" by @erasche>
-DEBUG:root:[Check PRs to dev for mergability] Evaluating plus__ge 1 for <#1 "Testing change for p4" by @erasche>
-INFO:requests.packages.urllib3.connectionpool:Starting new HTTPS connection (1): api.github.com
-DEBUG:requests.packages.urllib3.connectionpool:"GET /repos/erasche/gx-package-caching/issues/1/comments?per_page=100&page=1 HTTP/1.1" 200 None
-DEBUG:root:[Check PRs to dev for mergability] Evaluating to_branch master for <#1 "Testing change for p4" by @erasche>
-INFO:root:Matched Check PRs to dev for mergability
+INFO:root:Registered PullRequestFilter Tag popular, but untriaged PRs
+INFO:root:Locating closed PRs
+INFO:root:Locating open PRs
+DEBUG:root:[1] Cache says: 2016-01-13 21:31:03 last updated at 2016-01-13 22:25:51
+INFO:root:Found 1 PRs to examine
+DEBUG:root:Evaluating 1
+DEBUG:root: [Check Procedures PRs for mergability]
+DEBUG:root:     state, open => True
+DEBUG:root:     title_contains__not, [PROCEDURES] => True
+DEBUG:root:     title_contains__not, [WIP] => True
+DEBUG:root:     created_at__ge, 'relative::24 hours ago' => True
+DEBUG:root:     plus__ge, 1 => True
+INFO:root:Matched 1
 INFO:root:Executing action
 ```
 
@@ -48,9 +55,9 @@ any PRs that need comments.
 
 ```
 (env)hxr@leda:~/work/p4$ python process.py
-INFO:root:Registered PullRequestFilter Check PRs to dev for mergability
-INFO:requests.packages.urllib3.connectionpool:Starting new HTTPS connection (1): api.github.com
-DEBUG:requests.packages.urllib3.connectionpool:"GET /repos/erasche/gx-package-caching/pulls?per_page=100&state=open&page=1 HTTP/1.1" 200 None
-2015-09-15 02:07:00 2015-09-15 02:07:00
-DEBUG:root:Found 0 PRs to examine
+INFO:root:Registered PullRequestFilter Tag popular, but untriaged PRs
+INFO:root:Locating closed PRs
+INFO:root:Locating open PRs
+DEBUG:root:[1] Cache says: 2016-01-13 22:25:51 last updated at 2016-01-13 22:25:51
+INFO:root:Found 0 PRs to examine
 ```
