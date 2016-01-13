@@ -53,7 +53,7 @@ class PullRequestFilter(object):
             if not res:
                 return
 
-        log.info("Matched %s", pr.id)
+        log.info("Matched %s", pr.number)
         # If we've made it this far, we pass ALL conditions
         for action in self.actions:
             self.execute(pr, action)
@@ -374,7 +374,7 @@ class MergerBot(object):
         log.info("Found %s PRs to examine", len(changed_prs))
         for changed in changed_prs:
 
-            log.debug("Evaluating %s", changed.id)
+            log.debug("Evaluating %s", changed.number)
             for pr_filter in self.pr_filters:
                 pr_filter.apply(changed)
                 self.update_pr(changed.id, changed.updated_at)
