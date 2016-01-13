@@ -74,7 +74,9 @@ repository:
                 - state: 'open'
                 - title_contains__not: '[PROCEDURES]'
                 - title_contains__not: '[WIP]'
+                # Must have two people voting
                 - plus__ge: 2
+                # Bugfixes are not against dev
                 - to_branch__not: dev
             actions:
                 -
@@ -83,6 +85,9 @@ repository:
                         {author}'s PR has reached the required number of votes
                         for merging.
         -
+            # According to Galaxy's Issues.rst as of 16.01,
+            # https://github.com/galaxyproject/galaxy/blob/release_16.01/doc/source/project/issues.rst
+            # All PRs will pass through a status/review phase.
             name: Check merged PRs for missing review tag.
             conditions:
                 - state: 'merged'
@@ -97,6 +102,7 @@ repository:
             name: Check merged PRs for missing kind tag.
             conditions:
                 - state: 'merged'
+                # We're only tagging new PRs as of these changes
                 - created_at__ge: 'precise::2016-01-01'
                 - has_tag__not: 'kind/.*'
             actions:
@@ -107,9 +113,10 @@ repository:
         -
             name: Add triage to new PRs.
             conditions:
+                # We're only tagging new PRs as of these changes
                 - created_at__ge: 'precise::2016-01-01'
                 - state: 'open'
-                    # This probably isn't perfect, but it'll be better
+                # This probably isn't perfect, but it'll be better
                 - has_tag__not: 'area/.*'
                 - has_tag__not: 'kind/.*'
                 - has_tag__not: 'status/.*'
@@ -120,6 +127,7 @@ repository:
                     action_value: 'triage'
         -
             name: Add status/WIP to new WIP PRs.
+            # Auto-tag things as WIP since submitters cannot.
             conditions:
                 - created_at__ge: 'precise::2016-01-01'
                 - state: 'open'
@@ -128,10 +136,16 @@ repository:
                 -
                     action: assign_tag
                     action_value: 'status/WIP'
+            # Note that there is no corresponding "remove status/wip" action.
+            # Some devs don't use [WIP] in their title, so it wouldn't make sense
+            # to remove their manually added WIP
         -
             name: Add next milestone.
+            # We want to get code in soon, if a PR is ready, it should have a milestone set.
             conditions:
                 - state: 'open'
+                # Exclude bugfixes / back patching
+                - to_branch: 'dev'
                 - created_at__ge: 'precise::2016-01-01'
                 - milestone: null
             actions:
