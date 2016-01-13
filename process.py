@@ -46,6 +46,7 @@ class PullRequestFilter(object):
         executed
         """
         log.debug("\t[%s]", self.name)
+        self.issue = self.repo.get_issue(pr.number)
         for (condition_key, condition_value) in self._condition_it():
             res = self.evaluate(pr, condition_key, condition_value)
             log.debug("\t\t%s, %s => %s", condition_key, condition_value, res)
@@ -229,7 +230,7 @@ class PullRequestFilter(object):
             return
 
         # Create the comment
-        pr.create_comment(
+        self.issue.create_comment(
             comment_text
         )
 
@@ -237,15 +238,13 @@ class PullRequestFilter(object):
         """Assigns a pr's milestone to next_milestone
         """
         # Can only update milestone through associated PR issue.
-        issue = self.repo.get_issue(pr.number)
-        issue.edit(milestone=self.next_milestone)
+        self.issue.edit(milestone=self.next_milestone)
 
     def execute_assign_tag(self, pr, action):
         """Tags a PR
         """
-        issue = self.repo.get_issue(pr.number)
         tag_name = action['action_value']
-        issue.add_to_labels(tag_name)
+        self.issue.add_to_labels(tag_name)
 
 
 class MergerBot(object):
