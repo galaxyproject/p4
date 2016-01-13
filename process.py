@@ -36,6 +36,7 @@ class PullRequestFilter(object):
         self.repo = repo
         self.bot_user = bot_user
         self.dry_run = dry_run
+        self.next_milestone = next_milestone
         log.info("Registered PullRequestFilter %s", name)
 
     def _condition_it(self):
@@ -51,8 +52,9 @@ class PullRequestFilter(object):
         log.debug("\t[%s]", self.name)
         try:
             self.issue = self.repo.get_issue(pr.number)
-        except socket.timeout:
+        except Exception, e:
             log.warn("Could not access issue")
+            log.warn(e)
             return False
 
         for (condition_key, condition_value) in self._condition_it():
