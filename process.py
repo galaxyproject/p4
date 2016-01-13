@@ -46,13 +46,18 @@ class PullRequestFilter(object):
         executed
         """
         log.debug("\t[%s]", self.name)
-        self.issue = self.repo.get_issue(pr.number)
+        try:
+            self.issue = self.repo.get_issue(pr.number)
+        except socket.timeout:
+            log.warn("Could not access issue")
+            return False
+
         for (condition_key, condition_value) in self._condition_it():
             res = self.evaluate(pr, condition_key, condition_value)
             log.debug("\t\t%s, %s => %s", condition_key, condition_value, res)
 
             if not res:
-                return
+                return True
 
         log.info("Matched %s", pr.number)
         # If we've made it this far, we pass ALL conditions
@@ -333,10 +338,12 @@ class MergerBot(object):
         and that's a monotonically increasing number of API requests per
         run. Suboptimal.
         """
+        log.info("Locating closed PRs")
         results = self.repo.get_pulls(state='closed')
         for i, result in enumerate(results):
             yield result
 
+        log.info("Locating open PRs")
         results = self.repo.get_pulls(state='open')
         for result in results:
             yield result
@@ -370,8 +377,10 @@ class MergerBot(object):
 
             log.debug("Evaluating %s", changed.number)
             for pr_filter in self.pr_filters:
-                pr_filter.apply(changed)
-                self.update_pr(changed.id, changed.updated_at)
+                success = pr_filter.apply(changed)
+                if success:
+                    # Otherwise we'll hit it again later
+                    self.update_pr(changed.id, changed.updated_at)
 
 
 if __name__ == '__main__':
