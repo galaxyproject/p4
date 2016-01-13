@@ -105,7 +105,7 @@ repository:
                     comment: |
                         This PR was merged without a 'kind/' tag, please correct.
         -
-            name: Add status/review to new PRs.
+            name: Add triage to new PRs.
             conditions:
                 - created_at__ge: 'precise::2016-01-01'
                 - state: 'open'
@@ -113,7 +113,7 @@ repository:
             actions:
                 -
                     action: assign_tag
-                    action_value: 'status/review'
+                    action_value: 'triage'
         -
             name: Add status/WIP to new WIP PRs.
             conditions:
