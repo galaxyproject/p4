@@ -86,7 +86,7 @@ repository:
             name: Check merged PRs for missing review tag.
             conditions:
                 - state: 'merged'
-                - created_at__ge: 'precise::2015-10-01'
+                - created_at__ge: 'precise::2016-01-01'
                 - has_tag__not: 'status/review'
             actions:
                 -
@@ -97,7 +97,7 @@ repository:
             name: Check merged PRs for missing kind tag.
             conditions:
                 - state: 'merged'
-                - created_at__ge: 'precise::2015-10-01'
+                - created_at__ge: 'precise::2016-01-01'
                 - has_tag__not: 'kind/.*'
             actions:
                 -
@@ -107,7 +107,7 @@ repository:
         -
             name: Add status/review to new PRs.
             conditions:
-                - created_at__ge: 'precise::2015-10-01'
+                - created_at__ge: 'precise::2016-01-01'
                 - state: 'open'
                 - title_contains__not: '[WIP]'
             actions:
@@ -117,7 +117,7 @@ repository:
         -
             name: Add status/WIP to new WIP PRs.
             conditions:
-                - created_at__ge: 'precise::2015-10-01'
+                - created_at__ge: 'precise::2016-01-01'
                 - state: 'open'
                 - title_contains: 'WIP'
             actions:
@@ -128,7 +128,7 @@ repository:
             name: Add next milestone.
             conditions:
                 - state: 'open'
-                - created_at__ge: 'precise::2015-10-01'
+                - created_at__ge: 'precise::2016-01-01'
                 - milestone: null
             actions:
                 -
@@ -137,7 +137,7 @@ repository:
             name: Comment on missing milestones.
             conditions:
                 - state: 'merged'
-                - created_at__ge: 'precise::2015-10-01'
+                - created_at__ge: 'precise::2016-01-01'
                 - milestone: null
             actions:
                 -
