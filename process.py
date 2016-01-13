@@ -151,6 +151,7 @@ class PullRequestFilter(object):
         """Search for hits to a regex in a list of comments
         """
         if comments is not None:
+            print type(comments)
             for comment in comments:
                 # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
                 if re.findall(regex, comment.body, re.MULTILINE):
