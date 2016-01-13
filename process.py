@@ -150,10 +150,11 @@ class PullRequestFilter(object):
     def _find_in_comments(self, comments, regex):
         """Search for hits to a regex in a list of comments
         """
-        for comment in comments:
-            # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
-            if re.findall(regex, comment.body, re.MULTILINE):
-                yield comment
+        if comments is not None:
+            for comment in comments:
+                # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
+                if re.findall(regex, comment.body, re.MULTILINE):
+                    yield comment
 
     def check_plus(self, pr, cv=None):
         if getattr(pr, 'memo_comments', None) is None:
