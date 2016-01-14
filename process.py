@@ -162,10 +162,10 @@ class PullRequestFilter(object):
         """Search for hits to a regex in a list of comments
         """
         if getattr(pr, 'memo_comments', None) is None:
-            pr.memo_comments = list(pr.get_comments())
+            pr.memo_comments = list(self.issue.get_comments())
 
         for comment in pr.memo_comments:
-            # log.debug('%s, "%s" => %s', regex, resource.body, re.match(regex, resource.body))
+            # log.debug('%s, "%s" => %s', regex, comment.body, re.match(regex, comment.body))
             if re.findall(regex, comment.body, re.MULTILINE):
                 yield comment
 
@@ -220,11 +220,10 @@ class PullRequestFilter(object):
     def execute_comment(self, pr, action):
         """Commenting action, generates a comment on the parent PR
         """
-        if getattr(pr, 'memo_comments', None) is None:
-            pr.memo_comments = list(pr.get_comments())
-
         comment_text = action['comment'].format(
             author='@' + pr.user.login
+            #TODO
+            #merged_by=
         ).strip().replace('\n', ' ')
 
         # Check if we've made this exact comment before, so we don't comment
@@ -383,7 +382,7 @@ class MergerBot(object):
             log.debug("Evaluating %s", changed.number)
             for pr_filter in self.pr_filters:
                 success = pr_filter.apply(changed)
-                if success:
+                if success and not self.dry_run:
                     # Otherwise we'll hit it again later
                     self.update_pr(changed.id, changed.updated_at)
 
