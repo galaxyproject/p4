@@ -172,7 +172,6 @@ class TestPullRequestFilter(unittest.TestCase):
         )
 
     def test_find_in_comments(self):
-        prf = PullRequestFilter("test_filter", [], [])
         comments_container = [
             [AttrDict({'body': '+1', 'expect': True})],
             [AttrDict({'body': ':+1:', 'expect': True})],
@@ -186,13 +185,17 @@ You have my :+1:, but I'd like a second pair of eyes merging this.""", 'expect':
         for x in comments_container:
             # Get comments needs to return a callable, so we shoehorn in a
             # closure to return 'x'
+            prf = PullRequestFilter("test_filter", [], [])
+
             def q():
                 return x
 
             # Then set up as function on fpr. There's probably an easier way to
-            # do this?
-            fpr = AttrDict({
+            # do this but whatever.
+            prf.issue = AttrDict({
                 'get_comments': q
+            })
+            fpr = AttrDict({
             })
             result = len(list(prf._find_in_comments(fpr, UPVOTE_REGEX))) > 0,
             self.assertEquals(
