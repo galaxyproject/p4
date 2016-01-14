@@ -92,6 +92,7 @@ repository:
                 - state: 'merged'
                 # We're only tagging new PRs as of these changes
                 - created_at__ge: 'precise::2016-01-01'
+                - has_tag__not: 'merge'
                 - has_tag__not: 'kind/.*'
             actions:
                 -
@@ -108,7 +109,7 @@ repository:
                 - has_tag__not: 'area/.*'
                 - has_tag__not: 'kind/.*'
                 - has_tag__not: 'status/.*'
-                - title_contains__not: '[WIP]'
+                - has_tag__not: 'merge'
             actions:
                 -
                     action: assign_tag
@@ -134,6 +135,9 @@ repository:
                 - state: 'open'
                 # Exclude bugfixes / back patching
                 - to_branch: 'dev'
+                # Only complete PRs
+                - has_tag__not: 'status/WIP'
+                - has_tag__not: 'merge'
                 - created_at__ge: 'precise::2016-01-01'
                 - milestone: null
             actions:
@@ -144,9 +148,21 @@ repository:
             conditions:
                 - state: 'merged'
                 - created_at__ge: 'precise::2016-01-01'
+                - has_tag__not: 'merge'
                 - milestone: null
             actions:
                 -
                     action: comment
                     comment: |
                         This PR was merged without a milestone attached.
+        -
+            name: Tag merges with missing merge tag
+            conditions:
+                - state: 'open'
+                - created_at__ge: 'precise::2016-01-01'
+                - title_contains: '[Merge]'
+                - has_tag__not: 'merge'
+            actions:
+                -
+                    action: assign_tag
+                    action_value: 'merge'
