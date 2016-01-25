@@ -121,6 +121,7 @@ repository:
                 - created_at__ge: 'precise::2016-01-01'
                 - state: 'open'
                 - title_contains: 'WIP'
+                - has_tag__not: 'status/WIP'
             actions:
                 -
                     action: assign_tag
