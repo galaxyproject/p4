@@ -106,6 +106,7 @@ repository:
                 - created_at__ge: 'precise::2016-01-01'
                 - state: 'open'
                 # This probably isn't perfect, but it'll be better
+                - has_tag__not: 'triage'
                 - has_tag__not: 'area/.*'
                 - has_tag__not: 'kind/.*'
                 - has_tag__not: 'status/.*'
