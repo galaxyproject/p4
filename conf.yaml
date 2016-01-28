@@ -168,3 +168,45 @@ repository:
                 -
                     action: assign_tag
                     action_value: 'merge'
+        # TODO: Need to remove all other popularity tags when applying a new one.
+        -
+            name: hotness - ouch
+            conditions:
+                - state: 'open'
+                # jmchilton originally requested this be more -1s than +1s.
+                - minus__ge: 3
+                - has_tag__not: 'popularity/unpopular'
+            actions:
+                -
+                    action: assign_tag
+                    action_value: 'popularity/unpopular'
+        -
+            name: hotness - mild
+            conditions:
+                - state: 'open'
+                - plus__ge: 1
+                - has_tag__not: 'popularity/low'
+            actions:
+                -
+                    action: assign_tag
+                    action_value: 'popularity/low'
+        -
+            name: hotness - medium
+            conditions:
+                - state: 'open'
+                - plus__ge: 4
+                - has_tag__not: 'popularity/medium'
+            actions:
+                -
+                    action: assign_tag
+                    action_value: 'popularity/medium'
+        -
+            name: hotness - spicy
+            conditions:
+                - state: 'open'
+                - plus__ge: 10
+                - has_tag__not: 'popularity/significant'
+            actions:
+                -
+                    action: assign_tag
+                    action_value: 'popularity/significant'
