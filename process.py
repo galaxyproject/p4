@@ -255,6 +255,12 @@ class PullRequestFilter(object):
         tag_name = action['action_value']
         self.issue.add_to_labels(tag_name)
 
+    def execute_remove_tag(self, pr, action):
+        """remove a tag from PR
+        """
+        tag_name = action['action_value']
+        self.issue.remove_from_labels(tag_name)
+
 
 class MergerBot(object):
 
