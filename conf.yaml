@@ -168,7 +168,6 @@ repository:
                 -
                     action: assign_tag
                     action_value: 'merge'
-        # TODO: Need to remove all other popularity tags when applying a new one.
         -
             name: hotness - ouch
             conditions:
@@ -187,6 +186,9 @@ repository:
                 - plus__ge: 1
                 - has_tag__not: 'popularity/low'
             actions:
+                 -
+                    action: remove_tag
+                    action_value: 'popularity/.*'
                 -
                     action: assign_tag
                     action_value: 'popularity/low'
@@ -198,6 +200,9 @@ repository:
                 - has_tag__not: 'popularity/medium'
             actions:
                 -
+                    action: remove_tag
+                    action_value: 'popularity/.*'
+                -
                     action: assign_tag
                     action_value: 'popularity/medium'
         -
@@ -207,6 +212,9 @@ repository:
                 - plus__ge: 10
                 - has_tag__not: 'popularity/significant'
             actions:
+                -
+                    action: remove_tag
+                    action_value: 'popularity/.*'
                 -
                     action: assign_tag
                     action_value: 'popularity/significant'
