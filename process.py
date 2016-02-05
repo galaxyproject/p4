@@ -256,10 +256,12 @@ class PullRequestFilter(object):
         self.issue.add_to_labels(tag_name)
 
     def execute_remove_tag(self, pr, action):
-        """remove a tag from PR
+        """remove a tag from PR if it matches the regex
         """
-        tag_name = action['action_value']
-        self.issue.remove_from_labels(tag_name)
+        m = re.compile(action['action_value'])
+        for label in self.issue.get_labels():
+            if m.match(label.name):
+                self.issue.remove_from_labels(label.name)
 
 
 class MergerBot(object):

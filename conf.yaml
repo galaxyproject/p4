@@ -186,15 +186,12 @@ repository:
                 - plus__ge: 1
                 - has_tag__not: 'popularity/low'
             actions:
+                 -
+                    action: remove_tag
+                    action_value: 'popularity/.*'
                 -
                     action: assign_tag
                     action_value: 'popularity/low'
-                 -
-                    action: remove_tag
-                    action_value: 'popularity/medium
-                -
-                    action: remove_tag
-                    action_value: 'popularity/significant'
         -
             name: hotness - medium
             conditions:
@@ -203,14 +200,11 @@ repository:
                 - has_tag__not: 'popularity/medium'
             actions:
                 -
+                    action: remove_tag
+                    action_value: 'popularity/.*'
+                -
                     action: assign_tag
                     action_value: 'popularity/medium'
-                -
-                    action: remove_tag
-                    action_value: 'popularity/low
-                -
-                    action: remove_tag
-                    action_value: 'popularity/significant'
         -
             name: hotness - spicy
             conditions:
@@ -219,11 +213,8 @@ repository:
                 - has_tag__not: 'popularity/significant'
             actions:
                 -
+                    action: remove_tag
+                    action_value: 'popularity/.*'
+                -
                     action: assign_tag
                     action_value: 'popularity/significant'
-                -
-                    action: remove_tag
-                    action_value: 'popularity/low
-                -
-                    action: remove_tag
-                    action_value: 'popularity/medium
