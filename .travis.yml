@@ -5,5 +5,3 @@ install:
     - pip install "tox"
 script:
     - cd $TRAVIS_BUILD_DIR && tox
-    # Validate yaml
-    - python -c 'import yaml; yaml.load(open("conf.yamlz", "r"))'
