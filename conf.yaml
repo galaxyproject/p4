@@ -5,7 +5,7 @@ meta:
 repository:
     owner: galaxyproject
     name: galaxy
-    next_milestone: "16.04"
+    next_milestone: "16.07"
     # List of people whose +1/-1 votes actually count
     pr_approvers:
         - martenson
@@ -25,7 +25,6 @@ repository:
         - nekrut
         - nitesh1989
         - nsoranzo
-        - tnabtaf
     # Filters are designed to say "is this PR at the current state in time interesting?"
     filters:
         -
@@ -54,7 +53,6 @@ repository:
             # If we pass all of our conditions, we execute one (or more)
             # actions.
             actions:
-
                 -
                     action: comment
                     comment: |
@@ -186,7 +184,7 @@ repository:
                 - plus__ge: 1
                 - has_tag__not: 'popularity/low'
             actions:
-                 -
+                -
                     action: remove_tag
                     action_value: 'popularity/.*'
                 -
