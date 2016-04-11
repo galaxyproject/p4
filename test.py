@@ -6,6 +6,16 @@ import parsedatetime
 from attrdict import AttrDict
 
 
+class TestYaml(unittest.TestCase):
+
+    def test_readable_yaml(self):
+        import yaml
+        with open('conf.yaml', 'r') as handle:
+            data = yaml.load(handle)
+
+        self.assertTrue('meta' in data)
+
+
 class TestPullRequestFilter(unittest.TestCase):
 
     def setUp(self):
