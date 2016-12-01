@@ -48,7 +48,7 @@ repository:
                 - title_contains: '[PROCEDURES]'
                 - title_contains__not: '[WIP]'
                 # And the PR is older than 192 hours ago
-                - created_at__ge: 'relative::192 hours ago'
+                - created_at__lt: 'relative::192 hours ago'
                 # With 5 or more :+1: votes
                 - plus__ge: 5
                 # And ZERO :-1: votes
