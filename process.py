@@ -113,9 +113,9 @@ class PullRequestFilter(object):
         result = func(pr, cv=condition_value)
 
         if condition_key == 'created_at':
-            log.debug("\t\tTime: %s %s %s", result, condition_value)
+            log.debug("\t\tTime: %s %s", result, condition_value)
             result, condition_value = self._time_to_int(result, condition_value)
-            log.debug("\t\tTime: %s %s %s", result, condition_value)
+            log.debug("\t\tTime: %s %s", result, condition_value)
 
         # There are two types of conditions, text and numeric.
         # Numeric conditions are only appropriate for the following types:
