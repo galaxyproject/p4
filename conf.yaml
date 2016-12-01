@@ -47,8 +47,8 @@ repository:
                 # If the title contains the text `[PROCEDURES]`
                 - title_contains: '[PROCEDURES]'
                 - title_contains__not: '[WIP]'
-                # And the PR is older than 168 hours ago
-                - created_at__ge: 'relative::168 hours ago'
+                # And the PR is older than 192 hours ago
+                - created_at__ge: 'relative::192 hours ago'
                 # With 5 or more :+1: votes
                 - plus__ge: 5
                 # And ZERO :-1: votes
@@ -59,7 +59,7 @@ repository:
                 -
                     action: comment
                     comment: |
-                        {author}'s PR has reached the threshold of 168 hours
+                        {author}'s PR has reached the threshold of 192 hours
                         and quorum of at least 5 binding +1 votes.
                 # The merge action is not yet implmemented, with no immediate
                 # plans
