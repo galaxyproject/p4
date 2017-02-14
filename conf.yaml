@@ -23,11 +23,9 @@ repository:
         - jxtx
         - natefoo
         - nekrut
-        - nturaga
         - nsoranzo
         - tnabtaf
         - mvdbeek
-        - remimarenco
     # Filters are designed to say "is this PR at the current state in time interesting?"
     filters:
         -
