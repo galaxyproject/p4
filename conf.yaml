@@ -92,6 +92,7 @@ repository:
                 # We're only tagging new PRs as of these changes
                 - created_at__ge: 'precise::2016-01-01'
                 - has_tag__not: 'merge'
+                - has_tag__not: 'minor'                
                 - has_tag__not: 'procedures'
                 - has_tag__not: 'kind/.*'
                 - title_contains_not: '[PROCEDURES]'
@@ -112,6 +113,7 @@ repository:
                 - has_tag__not: 'kind/.*'
                 - has_tag__not: 'status/.*'
                 - has_tag__not: 'merge'
+                - has_tag__not: 'minor'
             actions:
                 -
                     action: assign_tag
