@@ -140,14 +140,3 @@ repository:
                     action: comment
                     comment: |
                         This PR was merged without a milestone attached.
-        -
-            name: Tag merges with missing merge tag
-            conditions:
-                - state: 'open'
-                - created_at__ge: 'precise::2016-01-01'
-                - title_contains: '[Merge]'
-                - has_tag__not: 'merge'
-            actions:
-                -
-                    action: assign_tag
-                    action_value: 'merge'
