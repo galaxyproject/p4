@@ -64,25 +64,6 @@ repository:
                 #-
                     #action: merge
                     #comment: "Automatically merged by Galaxy Jenkins Github Bot"
-        -
-            # And finally we have another rule for non-PROCEDURES PRs to
-            # non-dev branches, i.e. bugfixes to old branches.
-            # Unlike regular PRs to dev, these must have at least 2 :+1: votes.
-            name: Check bugfix PRs for mergability
-            conditions:
-                - state: 'open'
-                - title_contains__not: '[PROCEDURES]'
-                - title_contains__not: '[WIP]'
-                # Must have two people voting
-                - plus__ge: 2
-                # Bugfixes are not against dev
-                - to_branch__not: dev
-            actions:
-                -
-                    action: comment
-                    comment: |
-                        {author}'s PR has reached the required number of votes
-                        for merging.
         # The following rules are loosely based on:
         # https://github.com/galaxyproject/galaxy/blob/release_16.01/doc/source/project/issues.rst
         -
