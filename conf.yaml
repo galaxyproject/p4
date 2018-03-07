@@ -95,7 +95,6 @@ repository:
                 - has_tag__not: 'minor'                
                 - has_tag__not: 'procedures'
                 - has_tag__not: 'kind/.*'
-                - title_contains_not: '[PROCEDURES]'
             actions:
                 -
                     action: comment
