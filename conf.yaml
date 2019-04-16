@@ -6,7 +6,7 @@ meta:
 repository:
     owner: galaxyproject
     name: galaxy
-    next_milestone: "19.05"
+    next_milestone: "19.09"
     # List of people whose +1/-1 votes actually count
     pr_approvers:
         - martenson
